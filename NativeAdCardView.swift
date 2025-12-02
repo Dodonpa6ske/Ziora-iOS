@@ -1,6 +1,7 @@
 import SwiftUI
 import GoogleMobileAds
 import Combine
+import UIKit
 
 // MARK: - ViewModel（ネイティブ広告の読み込み担当）
 
@@ -22,12 +23,20 @@ final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoaderDelegat
     func refreshAd() {
         isLoading = true
         loadFailed = false
-        
+
         let request = Request()
+
+        guard let rootViewController = UIApplication.topViewController() else {
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.loadFailed = true
+            }
+            return
+        }
 
         let loader = AdLoader(
             adUnitID: adUnitID,
-            rootViewController: nil,
+            rootViewController: rootViewController,
             adTypes: [.native],
             options: nil
         )
