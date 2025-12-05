@@ -19,6 +19,9 @@ struct HomeView: View {
     // ===== State =====
     @State private var showMenu = false
     
+    // ★ 追加: ストアマネージャー
+    @EnvironmentObject var storeManager: StoreManager
+    
     // Capture / upload state
     @State private var showCamera = false
     @State private var capturedImage: UIImage? = nil
@@ -52,6 +55,9 @@ struct HomeView: View {
     // リスト用
     @State private var showLikedList = false
     @State private var showSentList = false
+    
+    // ★ 追加: 課金画面シート用フラグ
+    @State private var showAdFreeSheet = false
     
     // ★ 広告管理用の新しいState
     @State private var gachaCount: Int = 0           // ガチャ実行回数
@@ -160,7 +166,7 @@ struct HomeView: View {
                         if showAdThisTime {
                             // ★ 広告カードを GachaCardShell でラップ
                             GachaCardShell {
-                                NativeAdCardView(adUnitID: "ca-app-pub-3940256099942544/3986624511")
+                                NativeAdCardView(adUnitID: testNativeAdUnitID)
                             }
                         } else if let image = gachaImage {
                             GachaResultCard(
@@ -269,7 +275,8 @@ struct HomeView: View {
                             showLikedList = true
                         },
                         onOpenAdFreePlan: {
-                            // TODO: Ad-free 画面
+                            // ★ 追加: 課金画面シートを表示するフラグをONにする
+                            showAdFreeSheet = true
                         },
                         onOpenNotificationSettings: {
                             // TODO: 通知設定画面
@@ -343,6 +350,11 @@ struct HomeView: View {
             }
         }
         
+        // ★ 追加: 課金画面シート
+        .sheet(isPresented: $showAdFreeSheet) {
+            AdFreePlanView()
+        }
+        
         // ===== エラーアラート =====
         .alert("Error", isPresented: Binding(
             get: { uploadErrorMessage != nil || gachaErrorMessage != nil },
@@ -405,13 +417,12 @@ struct HomeView: View {
         // ★ ガチャ回数をインクリメント
         gachaCount += 1
 
-        // ★ 広告表示ロジック
-        // 1. 初回（gachaCount == 1）は広告を出さない
-        // 2. 前回広告を出していたら（gachaCount - lastAdShownAt == 1）今回は出さない
-        // 3. 5回に1回は必ず広告を出す（gachaCount % 5 == 0）
-        // 4. それ以外はランダム（1/5の確率）
-        
         let shouldShowAd: Bool = {
+            // ★★★ 追加: 購入済みなら絶対に広告を出さない！ ★★★
+            if storeManager.hasPurchasedAdFree {
+                return false
+            }
+            
             // 初回は広告を出さない
             if gachaCount == 1 {
                 return false
@@ -478,6 +489,7 @@ struct HomeView: View {
             gachaImagePath = doc.imagePath
 
             // 画像本体のダウンロード
+            // ★ サムネイルではなくオリジナル画像をダウンロード（ガチャ結果は高画質で見たいため）
             let image = try await PhotoService.shared.downloadImage(imagePath: doc.imagePath)
 
             // スピン時間に合わせて残りを待つ

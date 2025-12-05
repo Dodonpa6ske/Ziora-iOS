@@ -2,6 +2,9 @@ import SwiftUI
 
 struct HamburgerMenuView: View {
     @Binding var isPresented: Bool
+    
+    // ★ 追加: 課金状態を監視して表示を変えるため
+    @EnvironmentObject var storeManager: StoreManager
 
     let onOpenSentList: () -> Void
     let onOpenLikedList: () -> Void
@@ -28,7 +31,7 @@ struct HamburgerMenuView: View {
                            height: proxy.size.height)
                     .ignoresSafeArea(edges: .vertical)
 
-                // メニュー項目（タイトルは削除）
+                // メニュー項目
                 VStack(alignment: .leading, spacing: 24) {
                     Spacer().frame(height: listTopPadding)
 
@@ -53,10 +56,15 @@ struct HamburgerMenuView: View {
                             }
                         )
 
+                        // ★ 変更: 購入状態に応じて表示を切り替え
                         MenuRowButton(
                             title: "Ad-free plan",
-                            subtitle: "Remove all ads",
-                            systemIcon: "sparkles",
+                            // 購入済みなら "Active"、未購入なら "Remove all ads"
+                            subtitle: storeManager.hasPurchasedAdFree ? "Active" : "Remove all ads",
+                            // 購入済みならチェックマーク、未購入ならキラキラ
+                            systemIcon: storeManager.hasPurchasedAdFree ? "checkmark.circle.fill" : "sparkles",
+                            // 購入済みなら緑色、未購入ならデフォルト（紫）
+                            iconColor: storeManager.hasPurchasedAdFree ? .green : nil,
                             action: {
                                 isPresented = false
                                 onOpenAdFreePlan()
@@ -88,7 +96,7 @@ struct HamburgerMenuView: View {
                     Spacer()
                 }
 
-                // （ZStack 内の一番下あたり）閉じるボタン
+                // 閉じるボタン
                 Button {
                     withAnimation(.easeIn(duration: 0.22)) {
                         isPresented = false
@@ -138,6 +146,8 @@ struct MenuRowButton: View {
     let title: String
     let subtitle: String
     let systemIcon: String
+    // ★ 追加: アイコンの色を外部から指定できるように変更（デフォルトはnil）
+    var iconColor: Color? = nil
     let action: () -> Void
 
     var body: some View {
@@ -149,7 +159,8 @@ struct MenuRowButton: View {
 
                     Image(systemName: systemIcon)
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color(hex: "6C6BFF"))
+                        // ★ 変更: iconColorが指定されていればそれを使い、なければデフォルトの紫を使う
+                        .foregroundColor(iconColor ?? Color(hex: "6C6BFF"))
                 }
                 .frame(width: 40, height: 40)
 

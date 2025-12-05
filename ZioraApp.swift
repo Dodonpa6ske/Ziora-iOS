@@ -19,12 +19,17 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct ZioraApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    
     @StateObject private var authManager = AuthManager.shared
+    // ★ 追加
+    @StateObject private var storeManager = StoreManager.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(authManager)
+                // ★ 追加
+                .environmentObject(storeManager)
         }
     }
 }
