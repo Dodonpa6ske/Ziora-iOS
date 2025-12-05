@@ -160,7 +160,7 @@ struct HomeView: View {
                         if showAdThisTime {
                             // ★ 広告カードを GachaCardShell でラップ
                             GachaCardShell {
-                                NativeAdCardView(adUnitID: testNativeAdUnitID)
+                                NativeAdCardView(adUnitID: "ca-app-pub-3940256099942544/3986624511")
                             }
                         } else if let image = gachaImage {
                             GachaResultCard(

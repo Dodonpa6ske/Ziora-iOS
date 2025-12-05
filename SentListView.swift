@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseAuth
 import UIKit
+import FirebaseFirestore
 
 // 送信済み 1 件分
 struct SentPhoto: Identifiable, Hashable {
@@ -232,35 +233,53 @@ struct SentListView: View {
     // MARK: - Data
 
     private func loadPhotos() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false }
+            guard !isLoading else { return }
+            isLoading = true
+            defer { isLoading = false }
 
-        do {
-            let docs = try await PhotoService.shared.fetchMyPhotos()
+            do {
+                let docs = try await PhotoService.shared.fetchMyPhotos()
 
-            var items: [SentPhoto] = []
-            for doc in docs {
-                do {
-                    let image = try await PhotoService.shared
-                        .downloadImage(imagePath: doc.imagePath)
-                    items.append(
-                        SentPhoto(id: doc.id, document: doc, image: image)
-                    )
-                } catch {
-                    print("Failed to download image for \(doc.id): \(error)")
+                var items: [SentPhoto] = []
+                
+                // ★ 並列ダウンロードで高速化（TaskGroupを使用）
+                try await withThrowingTaskGroup(of: SentPhoto?.self) { group in
+                    for doc in docs {
+                        group.addTask {
+                            do {
+                                // 🔴 ここを変更: downloadImage → downloadThumbnail
+                                let image = try await PhotoService.shared
+                                    .downloadThumbnail(originalPath: doc.imagePath)
+                                return SentPhoto(id: doc.id, document: doc, image: image)
+                            } catch {
+                                print("Failed to download thumbnail for \(doc.id): \(error)")
+                                return nil
+                            }
+                        }
+                    }
+                    
+                    // ダウンロード完了した順に配列に追加
+                    for try await item in group {
+                        if let item = item {
+                            items.append(item)
+                        }
+                    }
+                }
+
+                // 日付順（新しい順）に並べ直してセット
+                let sortedItems = items.sorted {
+                    ($0.document.createdAt?.dateValue() ?? Date()) > ($1.document.createdAt?.dateValue() ?? Date())
+                }
+
+                await MainActor.run {
+                    self.photos = sortedItems
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
                 }
             }
-
-            await MainActor.run {
-                self.photos = items
-            }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = error.localizedDescription
-            }
         }
-    }
 
     private func cancelSending(_ item: SentPhoto) async {
         do {

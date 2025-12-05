@@ -62,22 +62,31 @@ struct GachaResultCard: View {
                 Spacer()
                 HStack {
                     Spacer()
+                    // GachaResultCard.swift の中にある LikeButton(...) の部分を探して置き換え
+
                     LikeButton(
                         isLiked: Binding(
                             get: { likedStore.isLiked(id: photoId) },
                             set: { newValue in
-                                let lp = LikedPhoto(
-                                    id: photoId,
-                                    image: image,
-                                    imagePath: imagePath,
-                                    country: country,
-                                    region: region,
-                                    city: city,
-                                    dateText: dateText,
-                                    latitude: latitude,
-                                    longitude: longitude
-                                )
-                                likedStore.setLiked(newValue, photo: lp)
+                                if newValue {
+                                    // 追加するとき
+                                    let lp = LikedPhoto(
+                                        id: photoId,
+                                        // image: image,  <-- ここは削除されました
+                                        imagePath: imagePath,
+                                        country: country,
+                                        region: region,
+                                        city: city,
+                                        dateText: dateText,
+                                        latitude: latitude,
+                                        longitude: longitude
+                                    )
+                                    // ★ 画像を第2引数で渡す形に変更されました
+                                    likedStore.add(photo: lp, image: image)
+                                } else {
+                                    // 削除するとき
+                                    likedStore.remove(id: photoId)
+                                }
                             }
                         )
                     )

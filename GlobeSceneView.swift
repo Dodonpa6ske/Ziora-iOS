@@ -3,7 +3,6 @@ import SceneKit
 
 struct GlobeSceneView: UIViewRepresentable {
     /// 1回の「ガチャスピン」が始まるタイミングで呼ばれる
-    /// spinDuration: そのスピンにかかる予定時間（秒）
     var onSpin: (_ spinDuration: TimeInterval) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
@@ -14,11 +13,17 @@ struct GlobeSceneView: UIViewRepresentable {
         let scnView = SCNView()
         scnView.backgroundColor = .clear
         scnView.allowsCameraControl = false
+        scnView.autoenablesDefaultLighting = false
+        scnView.isJitteringEnabled = true
 
         // ===== Scene / node セットアップ =====
         let scene = SCNScene(named: "ziora.usdz") ?? SCNScene()
         let root  = scene.rootNode
 
+        // ★ もうライトは消さない（Blender 側の設定も生かす）
+        // root.enumerateChildNodes { node, _ in node.light = nil }
+
+        // 地球ノードだけまとめる
         let globeNode = SCNNode()
         for child in root.childNodes {
             globeNode.addChildNode(child)
@@ -34,52 +39,85 @@ struct GlobeSceneView: UIViewRepresentable {
 
         // --- カメラ ---
         let cameraNode = SCNNode()
-        cameraNode.camera = SCNCamera()
+        let camera     = SCNCamera()
+        camera.usesOrthographicProjection = false
+        camera.wantsHDR = true
+        camera.wantsExposureAdaptation = false
+        cameraNode.camera = camera
         cameraNode.position = SCNVector3(0, 0, 7)
         scene.rootNode.addChildNode(cameraNode)
 
-        // --- ライティング（黒潰れ防止） ---
+        // =========================
+        //   ざっくりしたライト構成
+        // =========================
+
+        // MARK: 左上からのメインライト（白っぽい・広め）
+
         let keyLight = SCNLight()
-        keyLight.type = .directional
-        keyLight.intensity = 900
-        keyLight.color = UIColor(white: 1.0, alpha: 1.0)
+        keyLight.type      = .directional
+        keyLight.intensity = 2600
+        keyLight.color     = UIColor(white: 1.0, alpha: 1.0)
+        keyLight.castsShadow = false
 
         let keyLightNode = SCNNode()
         keyLightNode.light = keyLight
-        keyLightNode.position = SCNVector3(-3.0, 3.0, 6.0)
-        keyLightNode.look(at: SCNVector3(0, 0, 0))
+        // 左上から全体をなでる
+        keyLightNode.position = SCNVector3(-10.0, 10.0, 6.0)
+        keyLightNode.look(at: SCNVector3(0.0, 1.1, 0.0))
+
+
+
+        // MARK: 右側〜右下をふわっと紫で包むフィルライト
 
         let fillLight = SCNLight()
-        fillLight.type = .directional
-        fillLight.intensity = 600
-        fillLight.color = UIColor(red: 0.92, green: 0.94, blue: 1.0, alpha: 1.0)
+        fillLight.type      = .spot
+        fillLight.intensity = 3200                       // 紫の明るさ（強すぎたら 2800〜3000）
+        fillLight.color     = UIColor(
+            red:   0.93,   // しっかり紫寄り
+            green: 0.68,
+            blue:  1.0,
+            alpha: 1.0
+        )
+        fillLight.castsShadow = false
+
+        // ライトの広がり：かなり大きめにして「光源っぽさ」を消す
+        fillLight.spotInnerAngle = 65                    // コア（縁の一番明るい部分）
+        fillLight.spotOuterAngle = 150                   // ふわっと広がる範囲
+
+        // 距離減衰をかなりゆるくして、右側一帯にまわり込むように
+        fillLight.attenuationStartDistance   = 4.0
+        fillLight.attenuationEndDistance     = 80.0
+        fillLight.attenuationFalloffExponent = 0.8      // 小さいほど全体にふんわり回る
 
         let fillLightNode = SCNNode()
         fillLightNode.light = fillLight
-        fillLightNode.position = SCNVector3(3.0, -2.0, 6.0)
-        fillLightNode.look(at: SCNVector3(0, 0, 0))
 
-        let rimLight = SCNLight()
-        rimLight.type = .directional
-        rimLight.intensity = 950
-        rimLight.color = UIColor(white: 1.0, alpha: 1.0)
+        // 右前やや上から、地球の「右側面〜右下縁」をなでる
+        fillLightNode.position = SCNVector3(24.0, 4.0, 16.0)
+        // ← ここを動かすと右側の当たり方が変わる：x で左右、y で上下、z で距離
 
-        let rimLightNode = SCNNode()
-        rimLightNode.light = rimLight
-        rimLightNode.position = SCNVector3(0.0, 0.5, -6.5)
-        rimLightNode.look(at: SCNVector3(0, 0, 0))
+        // 狙う場所を「地球の右側」に変更（x をプラスに）
+        fillLightNode.look(at: SCNVector3(2.0, -0.3, 0.0))
+        // ↑ もっと下側を紫にしたければ y を -0.6 とかに、
+        //   もっと真正面寄りなら x を 1.0〜1.5 にしてみて
+
+
+
+        // MARK: 全体の底上げ用アンビエント
 
         let ambientLight = SCNLight()
-        ambientLight.type = .ambient
-        ambientLight.intensity = 120
-        ambientLight.color = UIColor(white: 0.9, alpha: 1.0)
+        ambientLight.type      = .ambient
+        ambientLight.intensity = 80                      // ちょい上げて影をやわらかく
+        ambientLight.color     = UIColor(white: 0.95, alpha: 1.0)
 
         let ambientLightNode = SCNNode()
         ambientLightNode.light = ambientLight
 
+
+
+        // ルートに追加
         scene.rootNode.addChildNode(keyLightNode)
         scene.rootNode.addChildNode(fillLightNode)
-        scene.rootNode.addChildNode(rimLightNode)
         scene.rootNode.addChildNode(ambientLightNode)
 
         // コンテナ
@@ -89,10 +127,11 @@ struct GlobeSceneView: UIViewRepresentable {
 
         scnView.scene = scene
 
+        // ★ ここで “ぐるっと一周・ふわっと光る” リムライトをマテリアルに付ける
+        applyRimShader(to: globeNode)
+
         // Coordinator にノードを渡す
         context.coordinator.globeNode = globeNode
-
-        // アイドリング回転開始
         context.coordinator.setIdleRotation(enabled: true)
 
         // パンジェスチャ
@@ -107,6 +146,47 @@ struct GlobeSceneView: UIViewRepresentable {
 
     func updateUIView(_ uiView: SCNView, context: Context) {}
 
+    // MARK: - Rim light shader
+
+    /// 法線と視線ベクトルのなす角で縁を判断して、
+    /// 地球のシルエット全周を白く発光させるシェーダ
+    private func applyRimShader(to globeNode: SCNNode) {
+        // surface ステージで emission を足す
+        let shader =
+        """
+        #pragma arguments
+        float rimStrength;
+        float rimPower;
+        float3 rimColor;
+        #pragma body
+
+        // normal と view の内積（0 = 真横, 1 = 正面）
+        float ndv = dot(_surface.normal, _surface.view);
+        ndv = clamp(ndv, 0.0, 1.0);
+
+        // 縁ほど値が大きくなるように反転＆べき乗
+        float rim = pow(1.0 - ndv, rimPower) * rimStrength;
+
+        // emission に追加して “ふわっと” 光らせる
+        _surface.emission.rgb += rim * rimColor;
+        """
+
+        globeNode.enumerateChildNodes { node, _ in
+            guard let geom = node.geometry else { return }
+
+            for material in geom.materials {
+                var modifiers = material.shaderModifiers ?? [:]
+                modifiers[.surface] = shader
+                material.shaderModifiers = modifiers
+
+                // 好きな感じになるまでここを微調整
+                material.setValue(1.2 as NSNumber,         forKey: "rimStrength") // 縁の明るさ
+                material.setValue(4.0 as NSNumber,          forKey: "rimPower")    // 縁の「幅」（大きいほど細くシャープ）
+                material.setValue(SCNVector3(1.4, 1.4, 1.7), forKey: "rimColor")   // 少しだけ青寄りの白
+            }
+        }
+    }
+
     // MARK: - Coordinator
 
     class Coordinator: NSObject {
@@ -114,7 +194,6 @@ struct GlobeSceneView: UIViewRepresentable {
 
         weak var globeNode: SCNNode?
         private var idleRotationEnabled = true
-        
         private var isDraggingGlobe = false
 
         init(parent: GlobeSceneView) {
@@ -127,7 +206,6 @@ struct GlobeSceneView: UIViewRepresentable {
             guard let node = globeNode else { return }
 
             node.removeAction(forKey: "idleRotation")
-
             guard enabled else { return }
 
             let rotate = SCNAction.rotateBy(
@@ -137,7 +215,6 @@ struct GlobeSceneView: UIViewRepresentable {
                 duration: 30
             )
             rotate.timingMode = .linear
-
             let forever = SCNAction.repeatForever(rotate)
             node.runAction(forever, forKey: "idleRotation")
         }
@@ -152,7 +229,6 @@ struct GlobeSceneView: UIViewRepresentable {
 
             switch gesture.state {
             case .began:
-                // 👇 タッチ位置が地球に当たっているか判定
                 let location = gesture.location(in: view)
                 let hits = view.hitTest(location, options: nil)
 
@@ -161,20 +237,16 @@ struct GlobeSceneView: UIViewRepresentable {
                     return result.node === globe || result.node.isChild(of: globe)
                 }
 
-                // 地球に当たっていなければ、このジェスチャーは無視
                 guard hitGlobe else {
                     isDraggingGlobe = false
                     return
                 }
 
                 isDraggingGlobe = true
-
-                // ここから先はこれまで通り
                 setIdleRotation(enabled: false)
                 node.removeAllActions()
 
             case .changed:
-                // 👇 地球をドラッグしていないジェスチャーは無視
                 guard isDraggingGlobe else { return }
 
                 let translation = gesture.translation(in: view)
@@ -244,8 +316,11 @@ struct GlobeSceneView: UIViewRepresentable {
                 break
             }
         }
-        }
+    }
 }
+
+// MARK: - 小さなヘルパー
+
 private extension SCNNode {
     /// self が target の子孫かどうか
     func isChild(of target: SCNNode) -> Bool {

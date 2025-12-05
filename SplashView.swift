@@ -7,14 +7,14 @@ struct SplashView: View {
 
     var body: some View {
         ZStack {
-            Color.zioraBlue
+            Color.black
                 .ignoresSafeArea()
 
             // Ziora ロゴ（PDF アセット名を "ziola_logo" として追加する想定）
             Image("ziora_logo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 96, height: 96) // 120px の 0.8倍サイズ
+                .frame(width: 90, height: 90) // 120px の 0.8倍サイズ
                 .opacity(logoOpacity)
         }
         .onAppear {

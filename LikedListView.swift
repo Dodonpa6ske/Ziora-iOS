@@ -13,6 +13,7 @@ struct LikedListView: View {
     @ObservedObject private var likedStore = LikedPhotoStore.shared
 
     @State private var selectedPhoto: LikedPhoto? = nil
+    @State private var selectedImage: UIImage? = nil // ★ 追加: 拡大表示用の画像保持
     @State private var cardScale: CGFloat = 0.9
     @State private var scrollOffset: CGFloat = 0
 
@@ -66,8 +67,10 @@ struct LikedListView: View {
                                     index: index
                                 )
                                 .onTapGesture {
-                                    // ハプティクスなしで拡大表示
+                                    // ★ 修正: タップされたらローカルから画像をロードしてセット
+                                    selectedImage = LikedPhotoStore.shared.loadLocalImage(for: photo)
                                     selectedPhoto = photo
+                                    
                                     cardScale = 0.85
                                     withAnimation(
                                         .interpolatingSpring(
@@ -80,7 +83,6 @@ struct LikedListView: View {
                                 }
                             }
                         }
-                        // 画面端との余白はお好みで、サムネイル同士の間隔は spacing=8 に任せる
                         .padding(.horizontal, 16)
                         .padding(.bottom, 40)
                     }
@@ -88,7 +90,7 @@ struct LikedListView: View {
                     .onPreferenceChange(ScrollOffsetPreferenceKey.self) {
                         scrollOffset = $0
                     }
-                    // 上方向のフェード（初期表示では出ないように 10pt 以上スクロールで発動）
+                    // 上方向のフェード
                     .overlay(
                         VStack(spacing: 0) {
                             LinearGradient(
@@ -114,7 +116,7 @@ struct LikedListView: View {
                 Spacer().frame(height: 40)
             }
 
-            // 右下のバツボタン（ホームのハート位置イメージ）
+            // 右下のバツボタン
             Button {
                 dismiss()
             } label: {
@@ -134,17 +136,19 @@ struct LikedListView: View {
             .padding(.bottom, 40)
 
             // 拡大カードのオーバーレイ（画面中央）
-            if let photo = selectedPhoto {
+            // ★ 修正: photo と image 両方が揃っているときだけ表示
+            if let photo = selectedPhoto, let image = selectedImage {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
                     .onTapGesture {
                         selectedPhoto = nil
+                        selectedImage = nil // クリア
                     }
 
                 VStack {
                     Spacer()
                     GachaResultCard(
-                        image: photo.image,
+                        image: image, // ★ 修正: ここでロードした画像を渡す (photo.image ではない)
                         country: photo.country,
                         region: photo.region,
                         city: photo.city,
