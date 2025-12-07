@@ -34,3 +34,17 @@ extension DateFormatter {
         return df
     }()
 }
+
+// MARK: - Custom Colors
+extension Color {
+    static let zioraPrimary = Color(hex: "6C6BFF") // アプリのメインカラー（青紫）
+}
+
+// MARK: - Button Styles
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}

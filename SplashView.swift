@@ -16,6 +16,7 @@ struct SplashView: View {
                 .scaledToFit()
                 .frame(width: 90, height: 90) // 120px の 0.8倍サイズ
                 .opacity(logoOpacity)
+                .offset(y: -40)
         }
         .onAppear {
             // ロゴをふわっと表示させるアニメーション

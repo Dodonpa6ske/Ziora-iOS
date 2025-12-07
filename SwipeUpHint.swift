@@ -22,36 +22,52 @@ struct SwipeUpHint: View {
 
 struct CameraMainButton: View {
     let action: () -> Void
-    private let size: CGFloat = 85
+    
+    private let buttonSize: CGFloat = 84
+    private let iconSize: CGFloat = 32
+    private let plusThickness: CGFloat = 6
+    private let plusCornerRadius: CGFloat = 2
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                // 外周ストローク
+                // 背景の円
                 Circle()
-                    .strokeBorder(Color(hex: "6C6BFF").opacity(0.10), lineWidth: 2)
-                    .frame(width: 80, height: 80)
-
-                // 中央のグラデーション丸
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(hex: "908FF7"),
-                                Color(hex: "6C6BFF")
-                            ]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                    .fill(Color.zioraPrimary) // メインカラー（青紫）
+                    .frame(width: buttonSize, height: buttonSize)
+                    
+                    // ★ 変更: overlay ではなく background にして背面に配置
+                    // stroke ではなく、少し大きい円を敷いて縁取りに見せる
+                    .background(
+                        Circle()
+                            .fill(Color.white.opacity(0.3))
+                            // ボタンより少し大きくして縁として見せる
+                            .frame(width: buttonSize + 8, height: buttonSize + 8)
                     )
-
-                Image(systemName: "plus")
-                    .font(.system(size: size * 0.45, weight: .bold))
-                    .foregroundColor(.white)
+                
+                // プラスアイコン
+                ZStack {
+                    RoundedRectangle(cornerRadius: plusCornerRadius)
+                        .fill(Color.white)
+                        .frame(width: iconSize, height: plusThickness)
+                    
+                    RoundedRectangle(cornerRadius: plusCornerRadius)
+                        .fill(Color.white)
+                        .frame(width: plusThickness, height: iconSize)
+                }
             }
-            .frame(width: size, height: size)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+// プレビュー
+struct CameraMainButton_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            Color.gray.opacity(0.2).ignoresSafeArea()
+            CameraMainButton(action: {})
+        }
     }
 }
 
@@ -78,40 +94,58 @@ struct CircleIconButton: View {
     let size: CGFloat
     let foreground: Color
     let background: Color
-    let showShadow: Bool
+    var showShadow: Bool = true
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             ZStack {
+                // 背景の円
                 Circle()
                     .fill(background)
+                    .frame(width: size, height: size)
+                    
+                    // ★ 変更: background で背面に配置
+                    .background(
+                        Circle()
+                            .fill(Color.black.opacity(0.05)) // 薄いグレー
+                            // ボタンより少し大きくする（枠線の太さ分）
+                            .frame(width: size + 3, height: size + 3)
+                    )
 
-                Circle()
-                    .strokeBorder(Color.black.opacity(0.10), lineWidth: 2)
-
-                if showShadow {
-                    Circle()
-                        .stroke(Color.white.opacity(0.4), lineWidth: 4)
-                        .blur(radius: 2)
-                        .offset(y: 2)
-                        .opacity(0.6)
-                }
-
+                // アイコン
                 Image(systemName: systemName)
-                    .font(.system(size: 25, weight: .bold))
+                    .font(.system(size: size * 0.45, weight: .semibold))
                     .foregroundColor(foreground)
-                    .frame(width: 25, height: 25)
             }
-            .frame(width: size, height: size)
-            .shadow(
-                color: showShadow ? Color.black.opacity(0.25) : .clear,
-                radius: showShadow ? 10 : 0,
-                x: 0,
-                y: showShadow ? 6 : 0
-            )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+// プレビュー
+struct CircleIconButton_Previews: PreviewProvider {
+    static var previews: some View {
+        HStack(spacing: 20) {
+            CircleIconButton(
+                systemName: "paperplane.fill",
+                size: 60,
+                foreground: Color(hex: "908FF7"),
+                background: .white,
+                showShadow: true // 常にシャドウあり
+            ) {}
+            
+            CircleIconButton(
+                systemName: "heart.fill",
+                size: 60,
+                foreground: Color(hex: "908FF7"),
+                background: .white,
+                showShadow: true // 常にシャドウあり
+            ) {}
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .previewLayout(.sizeThatFits)
     }
 }
 
