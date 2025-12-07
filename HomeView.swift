@@ -69,8 +69,8 @@ struct HomeView: View {
     
     var body: some View {
         ZStack {
-            // 背景グラデーション
-            ZioraBackgroundGradient().ignoresSafeArea()
+            ZioraBackgroundGradient()
+                            .ignoresSafeArea()
             
             // 地球
             GlobeSceneView { spinDuration in

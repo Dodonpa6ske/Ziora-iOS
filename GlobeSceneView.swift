@@ -36,57 +36,60 @@ struct GlobeSceneView: UIViewRepresentable {
         scene.rootNode.addChildNode(cameraNode)
 
         // =========================
-        //   ライティング設定（メリハリ版・継続）
+        //   ライティング設定（5灯体制・維持）
         // =========================
 
-        // 1. アンビエントライト
         let ambientLight = SCNLight()
         ambientLight.type = .ambient
-        ambientLight.intensity = 150
-        ambientLight.color = UIColor(white: 0.8, alpha: 1.0)
+        ambientLight.intensity = 50
+        ambientLight.color = UIColor(white: 0.5, alpha: 1.0)
         let ambientLightNode = SCNNode()
         ambientLightNode.light = ambientLight
 
-        // 2. メインライト
         let keyLight = SCNLight()
         keyLight.type = .directional
-        keyLight.intensity = 1000
+        keyLight.intensity = 3000
         keyLight.color = UIColor(white: 1.0, alpha: 1.0)
         keyLight.castsShadow = true
-        
         let keyLightNode = SCNNode()
         keyLightNode.light = keyLight
-        keyLightNode.position = SCNVector3(-5.0, 8.0, 10.0)
+        keyLightNode.position = SCNVector3(-18.0, 10.0, 15.0)
         keyLightNode.look(at: SCNVector3(0, 0, 0))
 
-        // 3. フィルライト
         let fillLight = SCNLight()
         fillLight.type = .directional
-        fillLight.intensity = 600
-        fillLight.color = UIColor(red: 0.6, green: 0.5, blue: 0.9, alpha: 1.0)
-        
+        fillLight.intensity = 2500
+        fillLight.color = UIColor(red: 0.7, green: 0.3, blue: 0.9, alpha: 1.0)
         let fillLightNode = SCNNode()
         fillLightNode.light = fillLight
-        fillLightNode.position = SCNVector3(5.0, -5.0, 5.0)
+        fillLightNode.position = SCNVector3(15.0, -20.0, 5.0)
         fillLightNode.look(at: SCNVector3(0, 0, 0))
 
-        // 4. リムライト
         let rimLight = SCNLight()
         rimLight.type = .spot
-        rimLight.intensity = 1200
-        rimLight.color = UIColor(red: 0.8, green: 0.8, blue: 1.0, alpha: 1.0)
+        rimLight.intensity = 1800
+        rimLight.color = UIColor(red: 0.8, green: 0.9, blue: 1.0, alpha: 1.0)
         rimLight.spotInnerAngle = 0
         rimLight.spotOuterAngle = 120
-        
         let rimLightNode = SCNNode()
         rimLightNode.light = rimLight
-        rimLightNode.position = SCNVector3(0, 5, -10)
+        rimLightNode.position = SCNVector3(0, 8, -10)
         rimLightNode.look(at: SCNVector3(0, 0, 0))
+
+        let sideLight = SCNLight()
+        sideLight.type = .directional
+        sideLight.intensity = 1500
+        sideLight.color = UIColor(red: 0.9, green: 0.9, blue: 1.0, alpha: 1.0)
+        let sideLightNode = SCNNode()
+        sideLightNode.light = sideLight
+        sideLightNode.position = SCNVector3(20.0, 0.0, 5.0)
+        sideLightNode.look(at: SCNVector3(0, 0, 0))
 
         scene.rootNode.addChildNode(ambientLightNode)
         scene.rootNode.addChildNode(keyLightNode)
         scene.rootNode.addChildNode(fillLightNode)
         scene.rootNode.addChildNode(rimLightNode)
+        scene.rootNode.addChildNode(sideLightNode)
 
         let containerNode = SCNNode()
         containerNode.addChildNode(globeNode)
@@ -130,19 +133,17 @@ struct GlobeSceneView: UIViewRepresentable {
 
             for material in geom.materials {
                 material.lightingModel = .physicallyBased
-                
-                // 質感設定（はっきりとした印象用）
-                material.roughness.contents = NSNumber(value: 0.8)
+                material.roughness.contents = NSNumber(value: 0.6)
                 material.metalness.contents = NSNumber(value: 0.1)
-                material.specular.contents = UIColor(white: 0.2, alpha: 1.0)
+                material.specular.contents = UIColor(white: 0.8, alpha: 1.0)
 
                 var modifiers = material.shaderModifiers ?? [:]
                 modifiers[.surface] = shader
                 material.shaderModifiers = modifiers
 
-                material.setValue(1.0 as NSNumber,         forKey: "rimStrength")
-                material.setValue(2.5 as NSNumber,         forKey: "rimPower")
-                material.setValue(SCNVector3(1.0, 1.0, 1.3), forKey: "rimColor")
+                material.setValue(2.0 as NSNumber,         forKey: "rimStrength")
+                material.setValue(4.0 as NSNumber,         forKey: "rimPower")
+                material.setValue(SCNVector3(0.8, 0.9, 1.0), forKey: "rimColor")
             }
         }
     }
@@ -161,6 +162,7 @@ struct GlobeSceneView: UIViewRepresentable {
             guard let node = globeNode else { return }
             node.removeAction(forKey: "idleRotation")
             guard enabled else { return }
+            // アイドル回転（ゆっくり）
             let rotate = SCNAction.rotateBy(x: 0, y: CGFloat.pi * 2, z: 0, duration: 30)
             rotate.timingMode = .linear
             node.runAction(SCNAction.repeatForever(rotate), forKey: "idleRotation")
@@ -177,34 +179,38 @@ struct GlobeSceneView: UIViewRepresentable {
                 isDraggingGlobe = true
                 setIdleRotation(enabled: false)
                 node.removeAllActions()
+                
             case .changed:
                 guard isDraggingGlobe else { return }
                 let translation = gesture.translation(in: view)
-                node.runAction(SCNAction.rotateBy(x: 0, y: translation.x * (.pi / 360), z: 0, duration: 0.1))
+                
+                // ★ 変更: 感度を下げて「回りすぎ」を防止 (0.008 -> 0.004)
+                let sensitivity: CGFloat = 0.004
+                node.runAction(SCNAction.rotateBy(x: 0, y: translation.x * sensitivity, z: 0, duration: 0.1))
                 gesture.setTranslation(.zero, in: view)
+                
             case .ended, .cancelled:
                 guard isDraggingGlobe else { return }
                 isDraggingGlobe = false
                 
-                // 元の回転ロジックを復元（型指定でコンパイルエラー回避）
                 let vX = gesture.velocity(in: view).x
                 let absV = abs(vX)
-                let minV: CGFloat = 600
+                
+                // ★ 変更: ガチャ発動のしきい値を上げて、誤発動を減らす (600 -> 1000)
+                let minV: CGFloat = 1000
                 
                 if absV > minV {
                     let maxV: CGFloat = 2400
                     let direction: CGFloat = (vX >= 0) ? 1 : -1
 
-                    // 速度のクランプと t値（0.0〜1.0）の計算
                     let clampedV = max(minV, min(maxV, absV))
                     let t = (clampedV - minV) / (maxV - minV)
 
-                    // 元の「勢い」計算式を復元
-                    let turns = 1.7 + 2.0 * t
+                    // ★ 変更: 回転数を抑えめにする (1.7~3.7回転 -> 1.2~2.7回転)
+                    let turns = 1.2 + 1.5 * t
                     let baseAngle = CGFloat.pi * 2 * turns * direction
                     let boostedAngle = baseAngle * 1.5
 
-                    // 時間計算
                     let minDuration: TimeInterval = 0.9
                     let maxDuration: TimeInterval = 1.8
                     let duration = maxDuration - (maxDuration - minDuration) * TimeInterval(t)
@@ -213,7 +219,7 @@ struct GlobeSceneView: UIViewRepresentable {
 
                     let spin = SCNAction.rotateBy(x: 0, y: boostedAngle, z: 0, duration: duration)
                     
-                    // ★ 復元: 元の独自イージング関数（Quartic Ease-Out）
+                    // 自然な減速
                     spin.timingMode = .linear
                     spin.timingFunction = { t in
                         let x = 1 - t
@@ -224,7 +230,12 @@ struct GlobeSceneView: UIViewRepresentable {
                         DispatchQueue.main.async { self.setIdleRotation(enabled: true) }
                     }
                 } else {
-                    setIdleRotation(enabled: true)
+                    // ★ 変更: 通常の慣性も弱めて、ピタッと止まりやすくする (0.002 -> 0.001)
+                    let inertia = SCNAction.rotateBy(x: 0, y: vX * 0.001, z: 0, duration: 1.0)
+                    inertia.timingMode = .easeOut
+                    node.runAction(inertia) {
+                         DispatchQueue.main.async { self.setIdleRotation(enabled: true) }
+                    }
                 }
             default: break
             }
