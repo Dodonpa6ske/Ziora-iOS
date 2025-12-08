@@ -3,6 +3,9 @@ import SceneKit
 
 struct GlobeSceneView: UIViewRepresentable {
     var onSpin: (_ spinDuration: TimeInterval) -> Void = { _ in }
+    
+    // パーティクルへ速度を伝えるための参照
+    @ObservedObject var interactionState: InteractionState
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -23,8 +26,10 @@ struct GlobeSceneView: UIViewRepresentable {
             globeNode.addChildNode(child)
         }
 
+        // 基本スケール
         globeNode.scale = SCNVector3(9.7, 9.7, 9.7)
         globeNode.position = SCNVector3(0, -0.3, 0)
+        // 初期角度: X=270度
         globeNode.eulerAngles = SCNVector3(Float.pi * 1.5, Float.pi, 0)
 
         let cameraNode = SCNNode()
@@ -35,16 +40,14 @@ struct GlobeSceneView: UIViewRepresentable {
         cameraNode.position = SCNVector3(0, 0, 7)
         scene.rootNode.addChildNode(cameraNode)
 
-        // =========================
-        //   ライティング設定（5灯体制・維持）
-        // =========================
-
+        // ライティング
         let ambientLight = SCNLight()
         ambientLight.type = .ambient
         ambientLight.intensity = 50
         ambientLight.color = UIColor(white: 0.5, alpha: 1.0)
         let ambientLightNode = SCNNode()
         ambientLightNode.light = ambientLight
+        scene.rootNode.addChildNode(ambientLightNode)
 
         let keyLight = SCNLight()
         keyLight.type = .directional
@@ -55,6 +58,7 @@ struct GlobeSceneView: UIViewRepresentable {
         keyLightNode.light = keyLight
         keyLightNode.position = SCNVector3(-18.0, 10.0, 15.0)
         keyLightNode.look(at: SCNVector3(0, 0, 0))
+        scene.rootNode.addChildNode(keyLightNode)
 
         let fillLight = SCNLight()
         fillLight.type = .directional
@@ -64,6 +68,7 @@ struct GlobeSceneView: UIViewRepresentable {
         fillLightNode.light = fillLight
         fillLightNode.position = SCNVector3(15.0, -20.0, 5.0)
         fillLightNode.look(at: SCNVector3(0, 0, 0))
+        scene.rootNode.addChildNode(fillLightNode)
 
         let rimLight = SCNLight()
         rimLight.type = .spot
@@ -75,6 +80,7 @@ struct GlobeSceneView: UIViewRepresentable {
         rimLightNode.light = rimLight
         rimLightNode.position = SCNVector3(0, 8, -10)
         rimLightNode.look(at: SCNVector3(0, 0, 0))
+        scene.rootNode.addChildNode(rimLightNode)
 
         let sideLight = SCNLight()
         sideLight.type = .directional
@@ -84,11 +90,6 @@ struct GlobeSceneView: UIViewRepresentable {
         sideLightNode.light = sideLight
         sideLightNode.position = SCNVector3(20.0, 0.0, 5.0)
         sideLightNode.look(at: SCNVector3(0, 0, 0))
-
-        scene.rootNode.addChildNode(ambientLightNode)
-        scene.rootNode.addChildNode(keyLightNode)
-        scene.rootNode.addChildNode(fillLightNode)
-        scene.rootNode.addChildNode(rimLightNode)
         scene.rootNode.addChildNode(sideLightNode)
 
         let containerNode = SCNNode()
@@ -114,7 +115,6 @@ struct GlobeSceneView: UIViewRepresentable {
     func updateUIView(_ uiView: SCNView, context: Context) {}
 
     // MARK: - Material Setup
-
     private func setupGlobeMaterial(for node: SCNNode) {
         let shader = """
         #pragma arguments
@@ -154,6 +154,9 @@ struct GlobeSceneView: UIViewRepresentable {
         weak var globeNode: SCNNode?
         private var idleRotationEnabled = true
         private var isDraggingGlobe = false
+        
+        private let baseScale: CGFloat = 9.7
+        private let defaultPitch: Float = Float.pi * 1.5
 
         init(parent: GlobeSceneView) { self.parent = parent }
 
@@ -162,7 +165,6 @@ struct GlobeSceneView: UIViewRepresentable {
             guard let node = globeNode else { return }
             node.removeAction(forKey: "idleRotation")
             guard enabled else { return }
-            // アイドル回転（ゆっくり）
             let rotate = SCNAction.rotateBy(x: 0, y: CGFloat.pi * 2, z: 0, duration: 30)
             rotate.timingMode = .linear
             node.runAction(SCNAction.repeatForever(rotate), forKey: "idleRotation")
@@ -170,12 +172,14 @@ struct GlobeSceneView: UIViewRepresentable {
 
         @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
             guard let view = gesture.view as? SCNView, let node = globeNode else { return }
+            
             switch gesture.state {
             case .began:
                 let location = gesture.location(in: view)
                 let hits = view.hitTest(location, options: nil)
                 let hitGlobe = hits.contains { $0.node === node || $0.node.isChild(of: node) }
                 guard hitGlobe else { isDraggingGlobe = false; return }
+                
                 isDraggingGlobe = true
                 setIdleRotation(enabled: false)
                 node.removeAllActions()
@@ -183,30 +187,54 @@ struct GlobeSceneView: UIViewRepresentable {
             case .changed:
                 guard isDraggingGlobe else { return }
                 let translation = gesture.translation(in: view)
+                let velocity = gesture.velocity(in: view)
                 
-                // ★ 変更: 感度を下げて「回りすぎ」を防止 (0.008 -> 0.004)
-                let sensitivity: CGFloat = 0.004
-                node.runAction(SCNAction.rotateBy(x: 0, y: translation.x * sensitivity, z: 0, duration: 0.1))
+                // パーティクルへの速度伝達
+                parent.interactionState.velocity = velocity.x / 5.0
+                
+                let sensitivity: CGFloat = 0.005
+                // ★修正点: 縦(x)はマイナス、横(y)はプラスに設定（分析に基づく最適解）
+                node.runAction(SCNAction.rotateBy(x: -translation.y * sensitivity, y: translation.x * sensitivity, z: 0, duration: 0.1))
+                
                 gesture.setTranslation(.zero, in: view)
                 
             case .ended, .cancelled:
                 guard isDraggingGlobe else { return }
                 isDraggingGlobe = false
                 
-                let vX = gesture.velocity(in: view).x
-                let absV = abs(vX)
-                
-                // ★ 変更: ガチャ発動のしきい値を上げて、誤発動を減らす (600 -> 1000)
+                let v = gesture.velocity(in: view)
+                let magnitude = sqrt(v.x * v.x + v.y * v.y)
                 let minV: CGFloat = 1000
                 
-                if absV > minV {
-                    let maxV: CGFloat = 2400
-                    let direction: CGFloat = (vX >= 0) ? 1 : -1
+                func makeStraightenAction(duration: TimeInterval) -> SCNAction {
+                    let startX = node.eulerAngles.x
+                    let startZ = node.eulerAngles.z
+                    let targetX = self.defaultPitch
+                    let targetZ: Float = 0
+                    
+                    return SCNAction.customAction(duration: duration) { node, elapsedTime in
+                        let t = CGFloat(elapsedTime) / CGFloat(duration)
+                        let factor = Float(t * (2 - t))
+                        node.eulerAngles.x = startX + (targetX - startX) * factor
+                        node.eulerAngles.z = startZ + (targetZ - startZ) * factor
+                    }
+                }
 
-                    let clampedV = max(minV, min(maxV, absV))
+                if magnitude > minV {
+                    // --- ガチャ発動 ---
+                    let scaleDown = SCNAction.scale(to: baseScale * 0.95, duration: 0.2)
+                    scaleDown.timingMode = .easeOut
+                    let scaleUp = SCNAction.scale(to: baseScale, duration: 0.3)
+                    scaleUp.timingMode = .easeOut
+                    node.runAction(SCNAction.sequence([scaleDown, scaleUp]))
+                    
+                    let maxV: CGFloat = 2400
+                    // ★修正点: スピン方向は右スワイプ(x>0)なら正回転(1)
+                    let direction: CGFloat = (v.x >= 0) ? 1 : -1
+                    
+                    let clampedV = max(minV, min(maxV, magnitude))
                     let t = (clampedV - minV) / (maxV - minV)
 
-                    // ★ 変更: 回転数を抑えめにする (1.7~3.7回転 -> 1.2~2.7回転)
                     let turns = 1.2 + 1.5 * t
                     let baseAngle = CGFloat.pi * 2 * turns * direction
                     let boostedAngle = baseAngle * 1.5
@@ -217,24 +245,38 @@ struct GlobeSceneView: UIViewRepresentable {
 
                     DispatchQueue.main.async { self.parent.onSpin(duration) }
 
+                    // ガチャ回転（メインY軸）
                     let spin = SCNAction.rotateBy(x: 0, y: boostedAngle, z: 0, duration: duration)
-                    
-                    // 自然な減速
                     spin.timingMode = .linear
                     spin.timingFunction = { t in
                         let x = 1 - t
                         return 1 - x * x * x * x
                     }
                     
-                    node.runAction(spin) {
+                    let straighten = makeStraightenAction(duration: duration)
+                    let group = SCNAction.group([spin, straighten])
+                    
+                    node.runAction(group) {
+                        node.eulerAngles.x = self.defaultPitch
+                        node.eulerAngles.z = 0
                         DispatchQueue.main.async { self.setIdleRotation(enabled: true) }
                     }
+                    
                 } else {
-                    // ★ 変更: 通常の慣性も弱めて、ピタッと止まりやすくする (0.002 -> 0.001)
-                    let inertia = SCNAction.rotateBy(x: 0, y: vX * 0.001, z: 0, duration: 1.0)
+                    // --- ガチャ不発 ---
+                    // ★修正点: 慣性も縦マイナス、横プラス
+                    let inertiaX = -v.y * 0.001
+                    let inertiaY = v.x * 0.001
+                    let inertia = SCNAction.rotateBy(x: inertiaX, y: inertiaY, z: 0, duration: 1.0)
                     inertia.timingMode = .easeOut
-                    node.runAction(inertia) {
-                         DispatchQueue.main.async { self.setIdleRotation(enabled: true) }
+                    
+                    let straighten = makeStraightenAction(duration: 1.0)
+                    let group = SCNAction.group([inertia, straighten])
+                    
+                    node.runAction(group) {
+                        node.eulerAngles.x = self.defaultPitch
+                        node.eulerAngles.z = 0
+                        DispatchQueue.main.async { self.setIdleRotation(enabled: true) }
                     }
                 }
             default: break

@@ -65,17 +65,24 @@ struct HomeView: View {
     @State private var lastAdShownAt: Int = -100
     @State private var showAdThisTime = false
     
+    @StateObject private var interactionState = InteractionState()
+    
     private let gachaCardHeight: CGFloat = 520
+    
+    
     
     var body: some View {
         ZStack {
-            ZioraBackgroundGradient()
-                            .ignoresSafeArea()
+            
+            ParticleBackgroundView()
             
             // 地球
-            GlobeSceneView { spinDuration in
-                Task { await performGacha(expectedSpinDuration: spinDuration) }
-            }
+            GlobeSceneView(
+                onSpin: { spinDuration in
+                    Task { await performGacha(expectedSpinDuration: spinDuration) }
+                },
+                interactionState: interactionState
+            )
             .ignoresSafeArea(edges: .top)
             .padding(.top, 40)
             .padding(.bottom, 140)
@@ -128,33 +135,39 @@ struct HomeView: View {
             }
             
             // ガチャカード
-            if showGachaCard {
-                Color.black.opacity(0.35).ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showGachaCard = false }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { gachaImage = nil }
-                    }
-                VStack {
-                    Spacer()
-                    Group {
-                        if showAdThisTime {
-                            GachaCardShell { NativeAdCardView(adUnitID: testNativeAdUnitID) }
-                        } else if let image = gachaImage {
-                            GachaResultCard(
-                                image: image, country: gachaCountry, region: gachaRegion, city: gachaCity,
-                                dateText: gachaDateText, latitude: gachaLatitude, longitude: gachaLongitude,
-                                photoId: gachaPhotoId, imagePath: gachaImagePath
-                            )
+                        if showGachaCard {
+                            Color.black.opacity(0.35).ignoresSafeArea()
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showGachaCard = false }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { gachaImage = nil }
+                                }
+                            
+                            // ★修正: 上下のSpacerで挟んで、地球の位置に合わせて中央配置
+                            VStack {
+                                Spacer() // 上の余白
+                                
+                                Group {
+                                    if showAdThisTime {
+                                        GachaCardShell { NativeAdCardView(adUnitID: testNativeAdUnitID) }
+                                    } else if let image = gachaImage {
+                                        GachaResultCard(
+                                            image: image, country: gachaCountry, region: gachaRegion, city: gachaCity,
+                                            dateText: gachaDateText, latitude: gachaLatitude, longitude: gachaLongitude,
+                                            photoId: gachaPhotoId, imagePath: gachaImagePath
+                                        )
+                                    }
+                                }
+                                .frame(height: gachaCardHeight)
+                                .padding(.horizontal, 24)
+                                
+                                Spacer() // 下の余白（これで垂直中央になります）
+                            }
+                            // 地球が下のメニュー分(140pt)空けて少し上にいるので、カードも視覚的な中心に合わせて少し上げます
+                            .offset(y: -40)
+                            .scaleEffect(showGachaCard ? 1.0 : 0.7)
+                            .opacity(showGachaCard ? 1.0 : 0.0)
+                            .transition(.asymmetric(insertion: .scale(scale: 0.7).combined(with: .opacity), removal: .scale(scale: 0.95).combined(with: .opacity)))
                         }
-                    }
-                    .frame(height: gachaCardHeight)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 80)
-                    .scaleEffect(showGachaCard ? 1.0 : 0.7)
-                    .opacity(showGachaCard ? 1.0 : 0.0)
-                }
-                .transition(.asymmetric(insertion: .scale(scale: 0.7).combined(with: .opacity), removal: .scale(scale: 0.95).combined(with: .opacity)))
-            }
             
             // 撮影プレビュー
             if showPreviewCard, let image = capturedImage {
@@ -376,3 +389,5 @@ struct HomeView: View {
         isGachaLoading = false
     }
 }
+
+

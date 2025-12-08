@@ -17,62 +17,55 @@ struct GachaResultCard: View {
 
     var body: some View {
         ZStack {
-            // 背景カード
+            // 背景: シンプルな白に戻しました（グラデーション削除）
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.white)
                 .shadow(color: Color.black.opacity(0.18),
                         radius: 18, x: 0, y: 10)
 
-            // 画像 + テキスト
+            // コンテンツ
             VStack(spacing: 0) {
+                // 画像エリア
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: 410)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                     .cornerRadius(20)
                     .padding(.top, 10)
                     .padding(.horizontal, 10)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        pill(country)
-                        pill(region)
-                        pill(city)
-                        Spacer()
-                    }
+                // 余白 10px
+                Color.clear.frame(height: 10)
 
+                // 位置情報ブロック
+                HStack(spacing: 6) {
+                    pill(country)
+                    pill(region)
+                    pill(city)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+
+                // 余白 5px
+                Color.clear.frame(height: 5)
+
+                // 撮影時間 & いいねボタン
+                HStack {
                     Text(dateText)
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
-                        .padding(.leading, 12)
-                }
-                .padding(.top, 10)
-                .padding(.bottom, 10)
-                .padding(.horizontal, 12)
+                        .padding(.leading, 4)
 
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity,
-                   maxHeight: .infinity,
-                   alignment: .top)
-
-            // 右下の LikeButton
-            VStack {
-                Spacer()
-                HStack {
                     Spacer()
-                    // GachaResultCard.swift の中にある LikeButton(...) の部分を探して置き換え
 
                     LikeButton(
                         isLiked: Binding(
                             get: { likedStore.isLiked(id: photoId) },
                             set: { newValue in
                                 if newValue {
-                                    // 追加するとき
                                     let lp = LikedPhoto(
                                         id: photoId,
-                                        // image: image,  <-- ここは削除されました
                                         imagePath: imagePath,
                                         country: country,
                                         region: region,
@@ -81,34 +74,32 @@ struct GachaResultCard: View {
                                         latitude: latitude,
                                         longitude: longitude
                                     )
-                                    // ★ 画像を第2引数で渡す形に変更されました
                                     likedStore.add(photo: lp, image: image)
                                 } else {
-                                    // 削除するとき
                                     likedStore.remove(id: photoId)
                                 }
                             }
                         )
                     )
-                    .padding(.trailing, 15)
-                    .padding(.bottom, 15)
                 }
+                .padding(.horizontal, 16)
+                
+                // 余白 15px (カード底辺まで)
+                Color.clear.frame(height: 15)
             }
-            .frame(maxWidth: .infinity,
-                   maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity,
-               maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .drawingGroup()
     }
 
     // ラベル用ピル
     private func pill(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 20, weight: .semibold))
-            .padding(.horizontal, 12)
+            .font(.system(size: 17, weight: .semibold))
+            .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+            // 背景が白になったので、タグが見えるように薄いグレーに戻しました
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(10)
     }
 }
