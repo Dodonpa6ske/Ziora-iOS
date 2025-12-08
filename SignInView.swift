@@ -1,4 +1,6 @@
 import SwiftUI
+import AuthenticationServices
+import Combine
 
 struct SignInView: View {
     let onSignedIn: () -> Void
@@ -8,9 +10,10 @@ struct SignInView: View {
 
     @State private var isLoading = false
     @State private var errorMessage: String?
-
-    // 👇 Guest モードの確認ダイアログ表示フラグ
     @State private var showGuestWarning = false
+
+    // ★追加: カスタムボタン用のヘルパーを保持
+    @StateObject private var appleSignInHelper = AppleSignInHelper()
 
     var body: some View {
         ZStack {
@@ -30,7 +33,7 @@ struct SignInView: View {
                 Spacer(minLength: 0)
 
                 VStack(spacing: OnboardingLayout.buttonSpacing) {
-                    // Google button
+                    // --- Google Button ---
                     Button {
                         Task { await handleGoogleSignIn() }
                     } label: {
@@ -49,17 +52,19 @@ struct SignInView: View {
                     }
                     .disabled(isLoading)
                     .background(
-                        Capsule()
-                            .fill(Color.white)
+                        Capsule().fill(Color.white)
                     )
                     .overlay(
-                        Capsule()
-                            .stroke(Color.primary.opacity(0.25), lineWidth: 1.5)
+                        Capsule().stroke(Color.primary.opacity(0.25), lineWidth: 1.5)
                     )
 
-                    // Apple button (placeholder implementation)
+                    // --- Apple Button (カスタムデザイン) ---
+                    // ★ご自身のデザインコードをそのまま使用し、アクションだけ変更しました
                     Button {
-                        Task { await handleAppleSignInPlaceholder() }
+                        // ヘルパー経由でAppleサインインを開始
+                        appleSignInHelper.startSignIn { result in
+                            handleAppleSignInResult(result)
+                        }
                     } label: {
                         HStack(spacing: 8) {
                             Image("apple_logo")
@@ -76,11 +81,10 @@ struct SignInView: View {
                     }
                     .disabled(isLoading)
                     .background(
-                        Capsule()
-                            .fill(Color.black)
+                        Capsule().fill(Color.black)
                     )
 
-                    // Continue as Guest  →  まずは確認ダイアログを出す
+                    // --- Continue as Guest ---
                     Button {
                         showGuestWarning = true
                     } label: {
@@ -93,9 +97,7 @@ struct SignInView: View {
                     .disabled(isLoading)
                 }
 
-                // space between "Continue as Guest" and terms
-                Color.clear
-                    .frame(height: 30)
+                Color.clear.frame(height: 30)
 
                 // Terms / Privacy
                 VStack(spacing: 4) {
@@ -106,14 +108,11 @@ struct SignInView: View {
                     HStack(spacing: 4) {
                         Link("Terms of Service", destination: termsURL)
                             .font(ZioraFont.body(12))
-
                         Text("and")
                             .font(ZioraFont.body(12))
                             .foregroundColor(.secondary)
-
                         Link("Privacy Policy", destination: privacyURL)
                             .font(ZioraFont.body(12))
-
                         Text(".")
                             .font(ZioraFont.body(12))
                             .foregroundColor(.secondary)
@@ -134,8 +133,7 @@ struct SignInView: View {
                 ProgressView()
             }
 
-            // SignInView 内の ZStack の中、showGuestWarning == true のところだけ差し替え
-
+            // ゲスト確認ダイアログ
             if showGuestWarning {
                 Color.black.opacity(0.35)
                     .ignoresSafeArea()
@@ -145,12 +143,10 @@ struct SignInView: View {
 
                 GuestModeWarningDialog(
                     onContinue: {
-                        // ゲストモードで続行
                         showGuestWarning = false
                         Task { await handleGuestSignIn() }
                     },
                     onBack: {
-                        // 何もせずダイアログを閉じてサインイン画面に戻る
                         showGuestWarning = false
                     }
                 )
@@ -192,6 +188,19 @@ struct SignInView: View {
             errorMessage = error.localizedDescription
         }
     }
+    
+    private func handleAppleSignInResult(_ result: Result<ASAuthorization, Error>) {
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+            do {
+                try await AuthManager.shared.handleAppleSignInCompletion(result: result)
+                onSignedIn()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
 
     private func handleGuestSignIn() async {
         isLoading = true
@@ -204,28 +213,20 @@ struct SignInView: View {
             errorMessage = error.localizedDescription
         }
     }
-
-    /// For now this just behaves like guest sign-in.
-    private func handleAppleSignInPlaceholder() async {
-        await handleGuestSignIn()
-    }
 }
 
 // MARK: - Guest mode warning dialog
-
 struct GuestModeWarningDialog: View {
     let onContinue: () -> Void
     let onBack: () -> Void
 
     var body: some View {
         VStack(spacing: 24) {
-            // Title
             Text("Start in Guest Mode")
                 .font(ZioraFont.buttonSemibold(20))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
 
-            // Body
             Text("""
 If you delete the app, your data will be erased, but you can later link an account to carry your data over.
 """)
@@ -234,21 +235,19 @@ If you delete the app, your data will be erased, but you can later link an accou
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 16) {
-                // ✅ Continue ボタンを少し小さめに（幅 240pt）
                 Button {
                     onContinue()
                 } label: {
                     Text("Continue")
                         .font(ZioraFont.buttonSemibold(16))
                         .foregroundColor(.white)
-                        .frame(width: 240, height: 65)   // ← 横幅を絞る
+                        .frame(width: 240, height: 65)
                 }
                 .background(
                     Capsule()
                         .fill(Color.zioraBlue)
                 )
 
-                // Back（テキストだけでOK）
                 Button {
                     onBack()
                 } label: {
@@ -261,8 +260,47 @@ If you delete the app, your data will be erased, but you can later link an accou
             }
         }
         .padding(24)
-        .frame(maxWidth: 320)        // ← ダイアログ自体の最大幅も少し絞る
+        .frame(maxWidth: 320)
         .background(Color.white)
         .cornerRadius(32)
+    }
+}
+
+// MARK: - Apple Sign In Helper (カスタムボタン用)
+
+final class AppleSignInHelper: NSObject, ObservableObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    
+    private var completion: ((Result<ASAuthorization, Error>) -> Void)?
+    
+    // ログイン処理を開始
+    func startSignIn(completion: @escaping (Result<ASAuthorization, Error>) -> Void) {
+        self.completion = completion
+        
+        let provider = ASAuthorizationAppleIDProvider()
+        let request = provider.createRequest()
+        
+        // AuthManagerでNonceとScopesを設定
+        AuthManager.shared.startAppleSignIn(request: request)
+        
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self
+        controller.presentationContextProvider = self
+        controller.performRequests()
+    }
+    
+    // MARK: - ASAuthorizationControllerDelegate
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        completion?(.success(authorization))
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        completion?(.failure(error))
+    }
+    
+    // MARK: - ASAuthorizationControllerPresentationContextProviding
+    
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        return UIApplication.shared.windows.first { $0.isKeyWindow } ?? ASPresentationAnchor()
     }
 }
