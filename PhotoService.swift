@@ -114,28 +114,28 @@ final class PhotoService {
         }
 
         // 5. Firestore にメタデータ保存
-                let now = FieldValue.serverTimestamp()
-                
-                // ★ 追加：7日後の日時を計算（86400秒 × 7日）
-                // serverTimestamp() とは別に、具体的な日付オブジェクトを作って渡す必要があります
-                let expireDate = Date().addingTimeInterval(7 * 24 * 60 * 60)
-                let expireTimestamp = Timestamp(date: expireDate)
+        let now = FieldValue.serverTimestamp()
+        
+        // ★ 追加：7日後の日時を計算（86400秒 × 7日）
+        // serverTimestamp() とは別に、具体的な日付オブジェクトを作って渡す必要があります
+        let expireDate = Date().addingTimeInterval(7 * 24 * 60 * 60)
+        let expireTimestamp = Timestamp(date: expireDate)
 
-                let randomSeed = Double.random(in: 0..<1)
+        let randomSeed = Double.random(in: 0..<1)
 
-                var payload: [String: Any] = [
-                    "userId":      user.uid,
-                    "imagePath":   imagePath,
-                    "country":     meta.country,
-                    "region":      meta.region,
-                    "city":        meta.city,
-                    "createdAt":   now,
-                    "expireAt":    expireTimestamp, // 👈 🔴 これを追加！
-                    "randomSeed":  randomSeed,
-                    "status":      "active",
-                    "likeCount":   0,
-                    "dateText":    meta.dateText
-                ]
+        var payload: [String: Any] = [
+            "userId":      user.uid,
+            "imagePath":   imagePath,
+            "country":     meta.country,
+            "region":      meta.region,
+            "city":        meta.city,
+            "createdAt":   now,
+            "expireAt":    expireTimestamp, // 👈 🔴 これを追加！
+            "randomSeed":  randomSeed,
+            "status":      "active",
+            "likeCount":   0,
+            "dateText":    meta.dateText
+        ]
 
         if let code = meta.countryCode {
             payload["countryCode"] = code
@@ -317,52 +317,53 @@ final class PhotoService {
     
     // MARK: - Thumbnail Download
 
-        /// サムネイル画像（200x200）をダウンロードする
-        /// ※ Firebase Extension "Resize Images" が導入されている前提
-        func downloadThumbnail(originalPath: String) async throws -> UIImage {
-            // 拡張子 (.jpg) の前に "_200x200" を挿入する
-            // 例: photos/uid/abc.jpg -> photos/uid/abc_200x200.jpg
-            let thumbPath: String
-            if let dotRange = originalPath.range(of: ".", options: .backwards) {
-                let base = originalPath[..<dotRange.lowerBound]
-                let ext = originalPath[dotRange.lowerBound...]
-                thumbPath = "\(base)_200x200\(ext)"
-            } else {
-                // 万が一拡張子がない場合
-                thumbPath = originalPath + "_200x200"
-            }
+    /// サムネイル画像（200x200）をダウンロードする
+    /// ※ Firebase Extension "Resize Images" が導入されている前提
+    func downloadThumbnail(originalPath: String) async throws -> UIImage {
+        // 拡張子 (.jpg) の前に "_200x200" を挿入する
+        // 例: photos/uid/abc.jpg -> photos/uid/abc_200x200.jpg
+        let thumbPath: String
+        if let dotRange = originalPath.range(of: ".", options: .backwards) {
+            let base = originalPath[..<dotRange.lowerBound]
+            let ext = originalPath[dotRange.lowerBound...]
+            thumbPath = "\(base)_200x200\(ext)"
+        } else {
+            // 万が一拡張子がない場合
+            thumbPath = originalPath + "_200x200"
+        }
 
-            let ref = storage.reference(withPath: thumbPath)
-            
-            // サムネイルは小さいので最大サイズは小さめでOK (例: 1MB)
-            let maxSize: Int64 = 1 * 1024 * 1024
+        let ref = storage.reference(withPath: thumbPath)
+        
+        // サムネイルは小さいので最大サイズは小さめでOK (例: 1MB)
+        let maxSize: Int64 = 1 * 1024 * 1024
 
-            do {
-                let data = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-                    ref.getData(maxSize: maxSize) { data, error in
-                        if let error = error {
-                            continuation.resume(throwing: error)
-                        } else if let data = data {
-                            continuation.resume(returning: data)
-                        } else {
-                            continuation.resume(throwing: NSError(domain: "PhotoService", code: -1, userInfo: nil))
-                        }
+        do {
+            let data = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+                ref.getData(maxSize: maxSize) { data, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else if let data = data {
+                        continuation.resume(returning: data)
+                    } else {
+                        continuation.resume(throwing: NSError(domain: "PhotoService", code: -1, userInfo: nil))
                     }
                 }
-                
-                if let image = UIImage(data: data) {
-                    return image
-                } else {
-                    throw NSError(domain: "PhotoService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
-                }
-            } catch {
-                // ★重要: サムネイル生成がまだ（アップ直後など）や、過去の画像でサムネイルがない場合は
-                // フォールバックとして「オリジナル画像」を取りに行く
-                print("Thumbnail not found, falling back to original: \(thumbPath)")
-                return try await downloadImage(imagePath: originalPath)
             }
+            
+            if let image = UIImage(data: data) {
+                return image
+            } else {
+                throw NSError(domain: "PhotoService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
+            }
+        } catch {
+            // ★重要: サムネイル生成がまだ（アップ直後など）や、過去の画像でサムネイルがない場合は
+            // フォールバックとして「オリジナル画像」を取りに行く
+            print("Thumbnail not found, falling back to original: \(thumbPath)")
+            return try await downloadImage(imagePath: originalPath)
         }
-     // MARK: - Fetch my photos (for sent list)
+    }
+    
+    // MARK: - Fetch my photos (for sent list)
 
     func fetchMyPhotos() async throws -> [PhotoDocument] {
         guard let user = Auth.auth().currentUser else {
@@ -429,7 +430,7 @@ final class PhotoService {
         return photos
     }
 
-     // MARK: - Delete photo (cancel sending)
+    // MARK: - Delete photo (cancel sending)
 
     func deletePhoto(documentId: String, imagePath: String) async throws {
         // Firestore のドキュメント削除
@@ -459,4 +460,41 @@ final class PhotoService {
         }
     }
 
-    } // ← PhotoService クラスはこの 1 個だけで閉じる
+    // MARK: - Notification Support
+
+    /// 通知用にFCMトークンをユーザー情報として保存
+    func saveFCMToken(_ token: String) {
+        guard let user = Auth.auth().currentUser else { return }
+        
+        // users/{uid} ドキュメントにトークンを保存（なければ作成）
+        db.collection("users").document(user.uid).setData([
+            "fcmToken": token,
+            "updatedAt": FieldValue.serverTimestamp()
+        ], merge: true)
+    }
+
+    /// 「いいね」情報をFirestoreに送信（これが通知のトリガーになります）
+    func sendLike(photoId: String) async {
+        guard let user = Auth.auth().currentUser else { return }
+        
+        // photos/{photoId}/likes/{myUserId} という場所にデータを書き込む
+        // Cloud Functions がこの書き込みを検知して通知を送ります
+        let likeRef = db.collection("photos").document(photoId)
+                        .collection("likes").document(user.uid)
+        
+        do {
+            try await likeRef.setData([
+                "likerId": user.uid,
+                "createdAt": FieldValue.serverTimestamp()
+            ])
+            
+            // ついでに写真本体のいいね数もカウントアップ（表示用）
+            try await db.collection("photos").document(photoId).updateData([
+                "likeCount": FieldValue.increment(Int64(1))
+            ])
+        } catch {
+            print("Failed to send like: \(error)")
+        }
+    }
+
+} // ← クラスの閉じカッコ

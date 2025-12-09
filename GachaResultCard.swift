@@ -60,27 +60,34 @@ struct GachaResultCard: View {
                     Spacer()
 
                     LikeButton(
-                        isLiked: Binding(
-                            get: { likedStore.isLiked(id: photoId) },
-                            set: { newValue in
-                                if newValue {
-                                    let lp = LikedPhoto(
-                                        id: photoId,
-                                        imagePath: imagePath,
-                                        country: country,
-                                        region: region,
-                                        city: city,
-                                        dateText: dateText,
-                                        latitude: latitude,
-                                        longitude: longitude
-                                    )
-                                    likedStore.add(photo: lp, image: image)
-                                } else {
-                                    likedStore.remove(id: photoId)
-                                }
-                            }
-                        )
-                    )
+                                            isLiked: Binding(
+                                                get: { likedStore.isLiked(id: photoId) },
+                                                set: { newValue in
+                                                    if newValue {
+                                                        // 1. ローカル保存（既存の処理）
+                                                        let lp = LikedPhoto(
+                                                            id: photoId,
+                                                            imagePath: imagePath,
+                                                            country: country,
+                                                            region: region,
+                                                            city: city,
+                                                            dateText: dateText,
+                                                            latitude: latitude,
+                                                            longitude: longitude
+                                                        )
+                                                        likedStore.add(photo: lp, image: image)
+                                                        
+                                                        // 2. ★追加: サーバーへ送信（通知のトリガー）
+                                                        Task {
+                                                            await PhotoService.shared.sendLike(photoId: photoId)
+                                                        }
+                                                        
+                                                    } else {
+                                                        likedStore.remove(id: photoId)
+                                                    }
+                                                }
+                                            )
+                                        )
                 }
                 .padding(.horizontal, 16)
                 
