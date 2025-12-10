@@ -22,7 +22,7 @@ struct GachaResultCard: View {
 
     var body: some View {
         ZStack {
-            // 背景
+            // 背景: シンプルな白に戻す
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.white)
                 .shadow(color: Color.black.opacity(0.18),
@@ -65,26 +65,18 @@ struct GachaResultCard: View {
                                 } label: { pill(city) }
                             }
                         }
-                        .padding(.horizontal, 16) // スクロールコンテンツ自体の左右余白
+                        .padding(.horizontal, 16)
                     }
                     .buttonStyle(.plain)
                     .fixedSize(horizontal: false, vertical: true)
-                    // 両端がフェードするグラデーションマスク
+                    // 両端フェード
                     .mask(
                         HStack(spacing: 0) {
-                            // 左端のフェード（透明 -> 黒）
-                            LinearGradient(gradient: Gradient(colors: [.clear, .black]), startPoint: .leading, endPoint: .trailing)
-                                .frame(width: 16)
-                            
-                            // 中央部分（黒＝表示エリア）
+                            LinearGradient(gradient: Gradient(colors: [.clear, .black]), startPoint: .leading, endPoint: .trailing).frame(width: 16)
                             Rectangle().fill(Color.black)
-                            
-                            // 右端のフェード（黒 -> 透明）
-                            LinearGradient(gradient: Gradient(colors: [.black, .clear]), startPoint: .leading, endPoint: .trailing)
-                                .frame(width: 16)
+                            LinearGradient(gradient: Gradient(colors: [.black, .clear]), startPoint: .leading, endPoint: .trailing).frame(width: 16)
                         }
                     )
-                    // マスクをかけた分、親のpaddingと重複しないように少し調整
                     .padding(.horizontal, -16)
 
                     
@@ -128,13 +120,12 @@ struct GachaResultCard: View {
                             )
                         )
                     }
-                    // 位置をずらす（視覚的に上に移動）
+                    // 位置調整
                     .offset(y: -8)
                 }
-                // ★修正箇所: パディングを個別に指定して下部を調整
-                .padding(.top, 16)       // 上はそのまま
-                .padding(.horizontal, 16) // 左右もそのまま
-                .padding(.bottom, 0)      // 下を0に（offset分で実質8px空く計算）
+                .padding(.top, 16)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 0)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -153,6 +144,7 @@ struct GachaResultCard: View {
             .font(.system(size: 15, weight: .semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
+            // 背景色も元に戻す
             .background(Color(.secondarySystemBackground))
             .cornerRadius(10)
     }
