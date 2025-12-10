@@ -52,8 +52,10 @@ struct GachaResultCard: View {
     // アラート制御用
     @State private var showReportConfirmation = false
     @State private var showBlockConfirmation = false
-    @State private var showThankYouMessage = false
     @State private var showBlockCompleteMessage = false
+    
+    // 完了アニメーション制御用
+    @State private var showSuccessOverlay = false
 
     var body: some View {
         ZStack {
@@ -102,9 +104,8 @@ struct GachaResultCard: View {
                                     .background(Color.black.opacity(0.2))
                                     .clipShape(Circle())
                             }
-                            // 右端3px, 上3pxの位置へ
                             .padding(.trailing, 13)
-                            .padding(.top, 15)
+                            .padding(.top, 18)
                         }
                     }
                 
@@ -192,6 +193,7 @@ struct GachaResultCard: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "heart.fill")
                                     .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(Color(hex: "4347E6"))
                                 Text("\(likeCount)")
                                     .font(.system(size: 14, weight: .semibold))
                             }
@@ -208,18 +210,53 @@ struct GachaResultCard: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // ★修正ポイント: ここに追加！
-        // これにより、カード全体（オーバーレイ含む）が1つのレイヤーとして合成され、
-        // 不透明度変更などのアニメーション時にボタンだけが残る現象を防げます。
+        // アニメーション対策: カード全体を1つのレイヤーとして合成
         .compositingGroup()
+        
+        // 完了アニメーションのオーバーレイ
+        .overlay {
+            if showSuccessOverlay {
+                ZStack {
+                    // 全体を少し暗くする背景
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    
+                    // 中央のHUD
+                    VStack(spacing: 16) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 44, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(12)
+                            .background(
+                                Circle()
+                                    .strokeBorder(Color.white, lineWidth: 3)
+                            )
+                        
+                        Text("Done")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    .padding(40)
+                    // ★修正: すりガラス効果のある暗い背景の正しい実装
+                    .background(.ultraThinMaterial) // すりガラス素材
+                    .environment(\.colorScheme, .dark) // ダークモード扱いにすることで暗いガラスにする
+                    .cornerRadius(20)
+                    // ポップアップアニメーション
+                    .transition(.scale.combined(with: .opacity))
+                }
+                // 全体のフェードイン・アウト
+                .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                .zIndex(999) // 最前面に表示
+            }
+        }
         
         .sheet(item: $mapDestination) { destination in
             LocationMapView(searchQuery: destination.query)
         }
-        // 通報ダイアログ
-        .confirmationDialog("Report this photo?", isPresented: $showReportConfirmation, titleVisibility: .visible) {
-            Button("Inappropriate Content") { submitReport(reason: "Inappropriate Content") }
-            Button("Spam or Scam") { submitReport(reason: "Spam or Scam") }
+        // 通報確認アラート (Cancelを目立たせるため他をdestructiveに)
+        .alert("Report this photo?", isPresented: $showReportConfirmation) {
+            Button("Inappropriate Content", role: .destructive) { submitReport(reason: "Inappropriate Content") }
+            Button("Spam or Scam", role: .destructive) { submitReport(reason: "Spam or Scam") }
             Button("Cancel", role: .cancel) {}
         }
         // ブロック確認ダイアログ
@@ -231,12 +268,7 @@ struct GachaResultCard: View {
         } message: {
             Text("You will no longer see photos from this user.")
         }
-        // 完了アラート
-        .alert("Report Sent", isPresented: $showThankYouMessage) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Thank you for your report. We will review this content shortly.")
-        }
+        
         .alert("Blocked", isPresented: $showBlockCompleteMessage) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -263,9 +295,21 @@ struct GachaResultCard: View {
             do {
                 try await PhotoService.shared.reportPhoto(photoId: photoId, reason: reason)
                 await MainActor.run {
+                    // 成功の触覚フィードバック
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
-                    showThankYouMessage = true
+                    
+                    // アニメーション付きでオーバーレイを表示
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        showSuccessOverlay = true
+                    }
+                    
+                    // 2秒後に自動で非表示にする
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            showSuccessOverlay = false
+                        }
+                    }
                 }
             } catch {
                 print("Failed to report: \(error)")
