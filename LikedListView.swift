@@ -8,6 +8,55 @@ private struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
+// ★ 追加: アニメーション修正済みのサムネイルビュー
+struct LikedThumbnailView: View {
+    let photo: LikedPhoto
+    let index: Int
+
+    @State private var image: UIImage? = nil
+    @State private var isVisible = false
+
+    var body: some View {
+        Group {
+            if let img = image {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                // ロード中はグレーの背景
+                Color.gray.opacity(0.2)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 220)
+        .clipped()
+        .cornerRadius(20)
+        // ★初期状態: 透明 & 40pt下に配置
+        .opacity(isVisible ? 1 : 0)
+        .offset(y: isVisible ? 0 : 40)
+        .onAppear {
+            // 画像ロード（まだ読み込んでいなければ）
+            if image == nil {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let loaded = LikedPhotoStore.shared.loadLocalImage(for: photo)
+                    DispatchQueue.main.async {
+                        self.image = loaded
+                    }
+                }
+            }
+            
+            // ★ SendListと同じSpringアニメーションと遅延(ラグ)を設定
+            guard !isVisible else { return }
+            withAnimation(
+                .spring(response: 0.55, dampingFraction: 0.85)
+                    .delay(Double(index) * 0.12) // インデックスに応じた遅延
+            ) {
+                isVisible = true
+            }
+        }
+    }
+}
+
 struct LikedListView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var likedStore = LikedPhotoStore.shared
@@ -158,8 +207,9 @@ struct LikedListView: View {
                         photoId: photo.id,
                         imagePath: photo.imagePath
                     )
+                    .frame(height: 520) // ★ 追加: HomeViewのガチャカードと高さを合わせる
                     .scaleEffect(cardScale)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 24) // ★ 変更: 16 -> 24 (HomeViewに合わせる)
                     Spacer()
                 }
             }

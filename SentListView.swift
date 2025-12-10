@@ -146,18 +146,20 @@ struct SentListView: View {
                     Spacer()
 
                     GachaResultCard(
-                        image: item.image,
-                        country: item.document.country,
-                        region: item.document.region,
-                        city: item.document.city,
-                        dateText: item.document.dateText ?? "",
-                        latitude: item.document.latitude,
-                        longitude: item.document.longitude,
-                        photoId: item.document.id,
-                        imagePath: item.document.imagePath
-                    )
-                    .scaleEffect(cardScale)
-                    .padding(.bottom, 16)
+                                            image: item.image,
+                                            country: item.document.country,
+                                            region: item.document.region,
+                                            city: item.document.city,
+                                            dateText: item.document.dateText ?? "",
+                                            latitude: item.document.latitude,
+                                            longitude: item.document.longitude,
+                                            photoId: item.document.id,
+                                            imagePath: item.document.imagePath
+                                        )
+                                        .frame(height: 520) // ★ 追加: HomeViewのガチャカードと高さを合わせる
+                                        .scaleEffect(cardScale)
+                                        .padding(.horizontal, 24) // ★ 追加: HomeViewのガチャカードと横幅(余白)を合わせる
+                                        .padding(.bottom, 16)
 
                     // いいね数 + 送信取り消しボタン
                     HStack {
