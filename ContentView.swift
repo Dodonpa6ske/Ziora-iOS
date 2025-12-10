@@ -19,10 +19,13 @@ struct ContentView: View {
 
     @State private var step: OnboardingStep = .splash
 
-    // 👇 これを追加（UserDefaultsに保存される）
+    // 👇 オンボーディング完了フラグ（UserDefaultsに保存）
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
 
-    @State private var selectedLanguageCode: String? = nil
+    // 👇 ★修正: 言語設定をUserDefaultsに保存するように変更 (初期値 "en")
+    // これにより LocationManager など他の場所からも "selectedLanguage" キーで参照可能になります
+    @AppStorage("selectedLanguage") private var selectedLanguageCode: String = "en"
+
     @State private var hasAgreedToTerms: Bool = false
 
     var body: some View {
@@ -48,7 +51,14 @@ struct ContentView: View {
 
             case .language:
                 LanguageSelectionView(
-                    selectedLanguageCode: $selectedLanguageCode,
+                    // ★修正: AppStorage(String) と View(String?) の型の不一致を解消するための変換
+                    selectedLanguageCode: Binding(
+                        get: { selectedLanguageCode },
+                        set: { newValue in
+                            // nilが来たらデフォルトの "en" を入れる
+                            selectedLanguageCode = newValue ?? "en"
+                        }
+                    ),
                     onNext: {
                         step = .terms
                     }
@@ -72,7 +82,8 @@ struct ContentView: View {
                         step = .terms
                     },
                     onClose: {
-                        selectedLanguageCode = nil
+                        // ★修正: nilではなく初期値に戻す
+                        selectedLanguageCode = "en"
                         hasAgreedToTerms = false
                         step = .splash
                     }

@@ -256,16 +256,43 @@ struct HomeView: View {
                 .zIndex(2)
             }
         }
-        .onReceive(locationManager.$lastPlacemark) { placemark in
-            guard let p = placemark else { return }
-            let isoCode = p.isoCountryCode ?? ""
-            capturedCountry = p.country ?? (isoCode.isEmpty ? "Country" : isoCode)
-            var region = p.administrativeArea ?? ""
-            var city = p.locality ?? p.subLocality ?? ""
-            if !region.isEmpty, region == city { city = p.subLocality ?? "" }
-            capturedRegion = region.isEmpty ? "State" : region
-            capturedCity = city.isEmpty ? "City" : city
-        }
+
+                .onReceive(locationManager.$lastPlacemark) { placemark in
+                    guard let p = placemark else { return }
+                    
+                    // 1. Country (国)
+                    let isoCode = p.isoCountryCode ?? ""
+                    capturedCountry = p.country ?? (isoCode.isEmpty ? "Country" : isoCode)
+                    
+                    // 2. Region (都道府県 / 州)
+                    // administrativeArea が基本。なければ空。
+                    let adminArea = p.administrativeArea ?? ""
+                    capturedRegion = adminArea.isEmpty ? "State" : adminArea
+                    
+                    // 3. City (市区町村)
+                    // ここが重要。locality (市) と subLocality (区) を組み合わせて詳細化する
+                    let locality = p.locality ?? ""       // 例: Osaka
+                    let subLocality = p.subLocality ?? "" // 例: Kita Ward
+                    
+                    if !subLocality.isEmpty {
+                        // 区がある場合 (政令指定都市など)
+                        // localityとsubLocalityが同じ名前の場合の重複排除も考慮
+                        if locality.isEmpty || locality == subLocality {
+                            capturedCity = subLocality
+                        } else {
+                            // "Kita Ward" だけだと弱いが、メタデータとしては "Kita Ward" を保存し
+                            // 表示や検索時に "Kita Ward, Osaka" と組み合わせるのが定石。
+                            // ここではシンプルに最も詳細な地名を採用する
+                            capturedCity = subLocality
+                        }
+                    } else {
+                        // 区がない場合は市を使う
+                        capturedCity = locality.isEmpty ? "City" : locality
+                    }
+                    
+                    // デバッグ出力
+                    print("📍 Location Update: \(capturedCity), \(capturedRegion), \(capturedCountry)")
+                }
         .fullScreenCover(isPresented: $showCamera) {
             ZStack {
                 Color.black.ignoresSafeArea()

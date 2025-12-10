@@ -8,14 +8,14 @@ private struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
-// 画像とメタデータをセットで保持する構造体
+// ★重要: 画像とメタデータをセットで保持する構造体（これが必要です）
 struct LikedPhotoItem: Identifiable {
     let id: String
     let photo: LikedPhoto
     let image: UIImage
 }
 
-// アニメーション修正済みのサムネイルビュー
+// ★重要: サムネイルビューの定義（これが必要です）
 struct LikedThumbnailView: View {
     let item: LikedPhotoItem
     let index: Int
@@ -153,7 +153,7 @@ struct LikedListView: View {
                 Spacer().frame(height: 40)
             }
 
-            // 右下のバツボタン（ホーム画面と位置・サイズを統一）
+            // 右下のバツボタン
             Button {
                 dismiss()
             } label: {
@@ -164,13 +164,14 @@ struct LikedListView: View {
                         .stroke(Color.black.opacity(0.1), lineWidth: 1)
                     
                     Image(systemName: "xmark")
-                        .font(.system(size: 24, weight: .semibold)) // 24pt
+                        .font(.system(size: 24, weight: .semibold))
                         .foregroundColor(.black)
                 }
-                .frame(width: 60, height: 60) // 60pt
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 0)
+                .frame(width: 60, height: 60)
+                // 影のぼかしなし (radius: 0)
+                .shadow(color: Color.black.opacity(0.1), radius: 0, x: 0, y: 0)
             }
-            .padding(.trailing, 33) // 右端から33pt (HomeViewと統一)
+            .padding(.trailing, 33)
             .padding(.bottom, 40)
 
             // 拡大カードのオーバーレイ
@@ -205,7 +206,6 @@ struct LikedListView: View {
                 .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
         }
-        // .ignoresSafeArea(edges: .bottom) を削除してセーフエリア準拠にする
         .task {
             await loadImages()
             await validatePhotos()
@@ -279,3 +279,4 @@ struct LikedListView: View {
         }
     }
 }
+

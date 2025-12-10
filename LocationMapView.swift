@@ -3,31 +3,30 @@ import MapKit
 import CoreLocation
 
 struct LocationMapView: View {
-    // 表示したい場所の名前（例: "Japan", "Osaka, Japan"）
+    // 検索クエリ（Country/Region用）
     let searchQuery: String
+    
+    // ★追加: 直接指定用の座標とスパン（City用）
+    var initialCoordinate: CLLocationCoordinate2D? = nil
+    var initialSpan: MKCoordinateSpan? = nil
 
     @Environment(\.dismiss) var dismiss
 
-    // マップの表示領域（初期値は世界全体を表示）
+    // デフォルト: 世界地図
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
         span: MKCoordinateSpan(latitudeDelta: 100, longitudeDelta: 100)
     )
     
-    // 見つかった場所に立てるピン
     @State private var pinItem: MapPinItem?
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // 地図
                 Map(coordinateRegion: $region, annotationItems: pinItem != nil ? [pinItem!] : []) { item in
                     MapMarker(coordinate: item.coordinate, tint: .red)
                 }
                 .ignoresSafeArea(edges: .bottom)
-                
-                // 検索中の場合などにインジケータを出しても良いですが、
-                // 今回はシンプルにアニメーションのみにします
             }
             .navigationTitle(searchQuery)
             .navigationBarTitleDisplayMode(.inline)
@@ -39,8 +38,21 @@ struct LocationMapView: View {
                 }
             }
             .onAppear {
-                // 画面が表示されたら、地名から場所を探して移動する
-                searchAndFly(to: searchQuery)
+                // ★修正: 座標が指定されていれば検索せずに直接移動
+                if let coord = initialCoordinate {
+                    let span = initialSpan ?? MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                    
+                    // ピンを立てる
+                    self.pinItem = MapPinItem(lat: coord.latitude, lon: coord.longitude)
+                    
+                    // アニメーションで移動
+                    withAnimation(.easeInOut(duration: 1.5)) {
+                        region = MKCoordinateRegion(center: coord, span: span)
+                    }
+                } else {
+                    // 従来通り検索を実行
+                    searchAndFly(to: searchQuery)
+                }
             }
         }
     }
@@ -54,26 +66,17 @@ struct LocationMapView: View {
                 return
             }
             
-            // 1. ピンの位置を設定
             let coordinate = location.coordinate
             self.pinItem = MapPinItem(lat: coordinate.latitude, lon: coordinate.longitude)
             
-            // 2. ズームレベル（表示範囲）を計算
-            // 国なら広く、都市なら狭く表示するために placemark.region を活用します
             var spanDelta: Double = 0.5
-            
             if let circularRegion = placemark.region as? CLCircularRegion {
-                // 半径(m)を度数に概算変換 (1度 ≒ 111km)
                 let radiusKm = circularRegion.radius / 1000.0
-                // 少し余白を持たせる係数をかける
                 spanDelta = (radiusKm / 111.0) * 2.2
-                
-                // あまりに寄りすぎたり引きすぎたりしないよう制限
-                if spanDelta < 0.02 { spanDelta = 0.02 } // 最小ズーム（詳細）
-                if spanDelta > 60.0 { spanDelta = 60.0 } // 最大ズーム（広域）
+                if spanDelta < 0.02 { spanDelta = 0.02 }
+                if spanDelta > 60.0 { spanDelta = 60.0 }
             }
             
-            // 3. アニメーションで移動（飛んでいく演出）
             withAnimation(.easeInOut(duration: 2.0)) {
                 region = MKCoordinateRegion(
                     center: coordinate,
@@ -84,7 +87,7 @@ struct LocationMapView: View {
     }
 }
 
-// ピン用モデル（前回のまま）
+// ピン用モデル
 struct MapPinItem: Identifiable {
     let id = UUID()
     let lat: Double

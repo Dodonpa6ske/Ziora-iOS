@@ -9,7 +9,7 @@ final class LocationManager: NSObject, ObservableObject {
     /// 直近の生の CLLocation
     @Published var lastLocation: CLLocation?
 
-    /// 直近の地名情報（英語表記）
+    /// 直近の地名情報（選択された言語での表記）
     @Published var lastPlacemark: CLPlacemark?
 
     private let manager = CLLocationManager()
@@ -41,6 +41,7 @@ final class LocationManager: NSObject, ObservableObject {
     }
 }
 
+
 // MARK: - CLLocationManagerDelegate
 
 extension LocationManager: CLLocationManagerDelegate {
@@ -54,10 +55,18 @@ extension LocationManager: CLLocationManagerDelegate {
             self.lastLocation = loc
         }
 
-        // 英語表記で国名・都市名を取得
-        let locale = Locale(identifier: "en_US")
+        // アプリ内で選択された言語設定を読み込む (デフォルトは "en")
+        // ContentViewで保存した "selectedLanguage" キーを使用
+        let languageCode = UserDefaults.standard.string(forKey: "selectedLanguage") ?? "en"
+        let locale = Locale(identifier: languageCode)
+        
+        // 指定された言語で国名・都市名を取得
         geocoder.reverseGeocodeLocation(loc, preferredLocale: locale) { [weak self] placemarks, error in
             guard error == nil, let placemark = placemarks?.first else { return }
+            
+            // デバッグ用: 取得できた全要素を確認
+            // print("📍 Placemark (\(languageCode)): \(placemark)")
+            
             DispatchQueue.main.async {
                 self?.lastPlacemark = placemark
             }
