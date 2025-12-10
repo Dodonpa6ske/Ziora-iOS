@@ -1,36 +1,39 @@
 import SwiftUI
+import UIKit
 
 struct LikeButton: View {
     @Binding var isLiked: Bool
+    
+    private let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
 
     var body: some View {
         Button(action: {
-            // 状態の切り替え時に spring アニメーションを適用
-            // これにより、アイコンが「ボヨン」と跳ねるように切り替わります
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.4, blendDuration: 0)) {
+            feedbackGenerator.impactOccurred()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                 isLiked.toggle()
             }
         }) {
-            // 背景の円は削除し、アイコンのみ表示
-            Image(systemName: isLiked ? "heart.fill" : "heart")
-                // サイズを少し大きめに設定 (以前の1.2倍スケール相当)
-                .font(.system(size: 28, weight: .medium))
-                // ONのときは鮮やかなピンク赤、OFFのときは少し濃いグレー
-                .foregroundColor(isLiked ? Color(red: 1.0, green: 0.2, blue: 0.4) : Color.gray)
-                // isLikedの状態変化に合わせてスケールも少しアニメーションさせることでポップアップ感を強調
-                .scaleEffect(isLiked ? 1.05 : 1.0)
+            // ★変更点: 常に "heart.fill" (塗り) を使用
+            Image(systemName: "heart.fill")
+                .font(.system(size: 20, weight: .light))
+                // ★変更点: OFFのときは黒色、ONのときはピンク
+                .foregroundColor(isLiked ? Color(hex: "4347E6") : Color.black)
+                // ★変更点: OFFのときは透明度40%
+                .opacity(isLiked ? 1.0 : 0.2)
+                .scaleEffect(isLiked ? 1.0 : 0.85)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLiked)
         }
-        // タップ領域を少し広げるためにフレームを設定（見た目には影響しません）
+        .buttonStyle(.plain)
         .frame(width: 44, height: 44)
     }
 }
 
-// プレビュー用（確認したい場合）
+// プレビュー
 struct LikeButton_Previews: PreviewProvider {
     static var previews: some View {
         Group {
             LikeButton(isLiked: .constant(false))
-                .previewDisplayName("OFF")
+                .previewDisplayName("OFF (Opacity 20%)")
             LikeButton(isLiked: .constant(true))
                 .previewDisplayName("ON")
         }

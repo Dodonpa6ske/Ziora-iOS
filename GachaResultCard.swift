@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct GachaResultCard: View {
     let image: UIImage
@@ -17,7 +18,7 @@ struct GachaResultCard: View {
     
     // マップ表示用
     @State private var showMap = false
-    @State private var mapQuery: String = "" // マップに渡す検索ワード
+    @State private var mapQuery: String = ""
 
     var body: some View {
         ZStack {
@@ -29,7 +30,7 @@ struct GachaResultCard: View {
 
             // コンテンツ
             VStack(spacing: 0) {
-                // 画像エリア
+                // 1. 画像エリア
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -38,126 +39,121 @@ struct GachaResultCard: View {
                     .cornerRadius(20)
                     .padding(.top, 10)
                     .padding(.horizontal, 10)
-
-                // 余白 10px
-                Color.clear.frame(height: 10)
-
-                // 位置情報ブロック (ここを修正)
-                // ★全体をButtonにするのではなく、各要素をButtonにする
-                HStack(spacing: 6) {
-                    
-                    // 1. Country (例: Japan)
-                    if !country.isEmpty {
-                        Button {
-                            openMap(for: country)
-                        } label: {
-                            pill(country)
-                        }
-                    }
-                    
-                    // 2. Region (例: Osaka)
-                    // 検索精度を上げるため "Osaka, Japan" のように国名も足すと良い
-                    if !region.isEmpty {
-                        Button {
-                            let query = country.isEmpty ? region : "\(region), \(country)"
-                            openMap(for: query)
-                        } label: {
-                            pill(region)
-                        }
-                    }
-                    
-                    // 3. City (例: Osaka City)
-                    if !city.isEmpty {
-                        Button {
-                            // 地域名があればそれも含める
-                            var parts: [String] = []
-                            parts.append(city)
-                            if !region.isEmpty { parts.append(region) }
-                            if !country.isEmpty { parts.append(country) }
-                            let query = parts.joined(separator: ", ")
-                            openMap(for: query)
-                        } label: {
-                            pill(city)
-                        }
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                // ボタンのスタイルをリセット（青文字になるのを防ぐ）
-                .buttonStyle(.plain)
-
-                // 余白 5px
-                Color.clear.frame(height: 5)
-
-                // 撮影時間 & いいねボタン
-                HStack {
-                    Text(dateText)
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                        .padding(.leading, 4)
-
-                    Spacer()
-
-                    LikeButton(
-                        isLiked: Binding(
-                            get: { likedStore.isLiked(id: photoId) },
-                            set: { newValue in
-                                if newValue {
-                                    let lp = LikedPhoto(
-                                        id: photoId,
-                                        imagePath: imagePath,
-                                        country: country,
-                                        region: region,
-                                        city: city,
-                                        dateText: dateText,
-                                        latitude: latitude,
-                                        longitude: longitude
-                                    )
-                                    likedStore.add(photo: lp, image: image)
-                                    
-                                    Task {
-                                        await PhotoService.shared.sendLike(photoId: photoId)
-                                    }
-                                    
-                                } else {
-                                    likedStore.remove(id: photoId)
-                                }
-                            }
-                        )
-                    )
-                }
-                .padding(.horizontal, 16)
                 
-                // 余白 15px (カード底辺まで)
-                Color.clear.frame(height: 15)
+                // 2. 下部情報エリア
+                VStack(alignment: .leading, spacing: 8) {
+                    
+                    // 上段: 位置情報タグ（横スクロール）
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            if !country.isEmpty {
+                                Button { openMap(for: country) } label: { pill(country) }
+                            }
+                            if !region.isEmpty {
+                                Button {
+                                    let query = country.isEmpty ? region : "\(region), \(country)"
+                                    openMap(for: query)
+                                } label: { pill(region) }
+                            }
+                            if !city.isEmpty {
+                                Button {
+                                    var parts: [String] = []
+                                    parts.append(city)
+                                    if !region.isEmpty { parts.append(region) }
+                                    if !country.isEmpty { parts.append(country) }
+                                    openMap(for: parts.joined(separator: ", "))
+                                } label: { pill(city) }
+                            }
+                        }
+                        .padding(.horizontal, 16) // スクロールコンテンツ自体の左右余白
+                    }
+                    .buttonStyle(.plain)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // 両端がフェードするグラデーションマスク
+                    .mask(
+                        HStack(spacing: 0) {
+                            // 左端のフェード（透明 -> 黒）
+                            LinearGradient(gradient: Gradient(colors: [.clear, .black]), startPoint: .leading, endPoint: .trailing)
+                                .frame(width: 16)
+                            
+                            // 中央部分（黒＝表示エリア）
+                            Rectangle().fill(Color.black)
+                            
+                            // 右端のフェード（黒 -> 透明）
+                            LinearGradient(gradient: Gradient(colors: [.black, .clear]), startPoint: .leading, endPoint: .trailing)
+                                .frame(width: 16)
+                        }
+                    )
+                    // マスクをかけた分、親のpaddingと重複しないように少し調整
+                    .padding(.horizontal, -16)
+
+                    
+                    // 下段: 撮影日時 + いいねボタン
+                    HStack(alignment: .center) {
+                        
+                        // 撮影日時
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                            Text(dateText)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // いいねボタン
+                        LikeButton(
+                            isLiked: Binding(
+                                get: { likedStore.isLiked(id: photoId) },
+                                set: { newValue in
+                                    if newValue {
+                                        let lp = LikedPhoto(
+                                            id: photoId,
+                                            imagePath: imagePath,
+                                            country: country,
+                                            region: region,
+                                            city: city,
+                                            dateText: dateText,
+                                            latitude: latitude,
+                                            longitude: longitude
+                                        )
+                                        likedStore.add(photo: lp, image: image)
+                                        Task { await PhotoService.shared.sendLike(photoId: photoId) }
+                                    } else {
+                                        likedStore.remove(id: photoId)
+                                    }
+                                }
+                            )
+                        )
+                    }
+                    // 位置をずらす（視覚的に上に移動）
+                    .offset(y: -8)
+                }
+                // ★修正箇所: パディングを個別に指定して下部を調整
+                .padding(.top, 16)       // 上はそのまま
+                .padding(.horizontal, 16) // 左右もそのまま
+                .padding(.bottom, 0)      // 下を0に（offset分で実質8px空く計算）
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .drawingGroup()
-        // シート表示
         .sheet(isPresented: $showMap) {
             LocationMapView(searchQuery: mapQuery)
         }
     }
     
-    // マップを開くヘルパー
     private func openMap(for query: String) {
         self.mapQuery = query
         self.showMap = true
     }
 
-    // ラベル用ピル（デザイン調整）
     private func pill(_ text: String) -> some View {
-        HStack(spacing: 4) {
-            Text(text)
-                .font(.system(size: 17, weight: .semibold))
-            // 虫眼鏡アイコンなどを小さく添えても分かりやすいかもしれません
-            // Image(systemName: "magnifyingglass").font(.caption2)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(10)
+        Text(text)
+            .font(.system(size: 15, weight: .semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(10)
     }
 }

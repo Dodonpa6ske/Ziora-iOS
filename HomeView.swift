@@ -135,39 +135,39 @@ struct HomeView: View {
             }
             
             // ガチャカード
-                        if showGachaCard {
-                            Color.black.opacity(0.35).ignoresSafeArea()
-                                .onTapGesture {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showGachaCard = false }
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { gachaImage = nil }
-                                }
-                            
-                            // ★修正: 上下のSpacerで挟んで、地球の位置に合わせて中央配置
-                            VStack {
-                                Spacer() // 上の余白
-                                
-                                Group {
-                                    if showAdThisTime {
-                                        GachaCardShell { NativeAdCardView(adUnitID: testNativeAdUnitID) }
-                                    } else if let image = gachaImage {
-                                        GachaResultCard(
-                                            image: image, country: gachaCountry, region: gachaRegion, city: gachaCity,
-                                            dateText: gachaDateText, latitude: gachaLatitude, longitude: gachaLongitude,
-                                            photoId: gachaPhotoId, imagePath: gachaImagePath
-                                        )
-                                    }
-                                }
-                                .frame(height: gachaCardHeight)
-                                .padding(.horizontal, 24)
-                                
-                                Spacer() // 下の余白（これで垂直中央になります）
-                            }
-                            // 地球が下のメニュー分(140pt)空けて少し上にいるので、カードも視覚的な中心に合わせて少し上げます
-                            .offset(y: -40)
-                            .scaleEffect(showGachaCard ? 1.0 : 0.7)
-                            .opacity(showGachaCard ? 1.0 : 0.0)
-                            .transition(.asymmetric(insertion: .scale(scale: 0.7).combined(with: .opacity), removal: .scale(scale: 0.95).combined(with: .opacity)))
+            if showGachaCard {
+                Color.black.opacity(0.35).ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showGachaCard = false }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { gachaImage = nil }
+                    }
+                
+                // ★修正: 上下のSpacerで挟んで、地球の位置に合わせて中央配置
+                VStack {
+                    Spacer() // 上の余白
+                    
+                    Group {
+                        if showAdThisTime {
+                            GachaCardShell { NativeAdCardView(adUnitID: testNativeAdUnitID) }
+                        } else if let image = gachaImage {
+                            GachaResultCard(
+                                image: image, country: gachaCountry, region: gachaRegion, city: gachaCity,
+                                dateText: gachaDateText, latitude: gachaLatitude, longitude: gachaLongitude,
+                                photoId: gachaPhotoId, imagePath: gachaImagePath
+                            )
                         }
+                    }
+                    .frame(height: gachaCardHeight)
+                    .padding(.horizontal, 24)
+                    
+                    Spacer() // 下の余白（これで垂直中央になります）
+                }
+                // 地球が下のメニュー分(140pt)空けて少し上にいるので、カードも視覚的な中心に合わせて少し上げます
+                .offset(y: -40)
+                .scaleEffect(showGachaCard ? 1.0 : 0.7)
+                .opacity(showGachaCard ? 1.0 : 0.0)
+                .transition(.asymmetric(insertion: .scale(scale: 0.7).combined(with: .opacity), removal: .scale(scale: 0.95).combined(with: .opacity)))
+            }
             
             // 撮影プレビュー
             if showPreviewCard, let image = capturedImage {
@@ -336,7 +336,15 @@ struct HomeView: View {
         isUploading = false
     }
     
-    private func performGacha(expectedSpinDuration: TimeInterval) async {
+    // ★ 修正: 自動修復機能付きガチャ
+    // retryCount引数を追加（デフォルト0）
+    private func performGacha(expectedSpinDuration: TimeInterval, retryCount: Int = 0) async {
+        // 無限ループ防止のため、リトライは3回まで
+        guard retryCount < 3 else {
+            isGachaLoading = false
+            return
+        }
+        
         guard !isGachaLoading, !showPreviewCard else { return }
         isGachaLoading = true
         gachaCount += 1
@@ -368,8 +376,14 @@ struct HomeView: View {
                 DispatchQueue.main.async { gachaErrorMessage = "No photos yet." }
                 isGachaLoading = false; return
             }
-            gachaLatitude = doc.latitude; gachaLongitude = doc.longitude; gachaPhotoId = doc.id; gachaImagePath = doc.imagePath
             
+            // 削除・リトライ時に使うため情報を保持
+            gachaLatitude = doc.latitude
+            gachaLongitude = doc.longitude
+            gachaPhotoId = doc.id
+            gachaImagePath = doc.imagePath
+            
+            // ★ ここで画像がない(404)とエラーになる
             let image = try await PhotoService.shared.downloadImage(imagePath: doc.imagePath)
             
             let elapsed = Date().timeIntervalSince(startTime)
@@ -379,15 +393,44 @@ struct HomeView: View {
             let dateString = doc.createdAt.map { DateFormatter.zioraDisplay.string(from: $0.dateValue()) } ?? ""
             
             DispatchQueue.main.async {
-                gachaCountry = doc.country; gachaRegion = doc.region; gachaCity = doc.city; gachaDateText = dateString; gachaLatitude = doc.latitude; gachaLongitude = doc.longitude; gachaImage = image
+                gachaCountry = doc.country
+                gachaRegion = doc.region
+                gachaCity = doc.city
+                gachaDateText = dateString
+                gachaLatitude = doc.latitude
+                gachaLongitude = doc.longitude
+                gachaImage = image
+                
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) { showGachaCard = true }
                 let generator = UIImpactFeedbackGenerator(style: .medium); generator.impactOccurred()
             }
+            // 成功時はローディング終了
+            isGachaLoading = false
+            
         } catch {
+            // ★ エラーハンドリング強化: ゾンビデータ検出＆自動修復
+            print("Gacha Error: \(error)")
+            
+            let nsError = error as NSError
+            // Storageエラーコード -13010: Object does not exist
+            let isNotFound = nsError.domain == "FIRStorageErrorDomain" && nsError.code == -13010
+            let isNotExistMsg = error.localizedDescription.contains("does not exist")
+            
+            if isNotFound || isNotExistMsg {
+                print("⚠️ ゾンビデータ検出: \(gachaPhotoId)。削除してリトライします。")
+                
+                // Firestoreから削除（Storageになくても念の為呼ぶ）
+                try? await PhotoService.shared.deletePhoto(documentId: gachaPhotoId, imagePath: gachaImagePath)
+                
+                // フラグをリセットして再試行（スピン時間は少し短くして違和感を減らす）
+                isGachaLoading = false
+                await performGacha(expectedSpinDuration: 0.5, retryCount: retryCount + 1)
+                return
+            }
+            
+            // 通常エラー（ネットワークエラー等）
             DispatchQueue.main.async { gachaErrorMessage = error.localizedDescription }
+            isGachaLoading = false
         }
-        isGachaLoading = false
     }
 }
-
-
