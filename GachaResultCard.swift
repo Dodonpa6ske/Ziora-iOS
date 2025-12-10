@@ -19,10 +19,12 @@ struct GachaResultCard: View {
     // マップ表示用
     @State private var showMap = false
     @State private var mapQuery: String = ""
+    
+    // ★削除: shimmerOffset ステートを削除
 
     var body: some View {
         ZStack {
-            // 背景: シンプルな白に戻す
+            // 背景: シンプルな白
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.white)
                 .shadow(color: Color.black.opacity(0.18),
@@ -127,6 +129,8 @@ struct GachaResultCard: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 0)
             }
+            
+            // ★削除: シャインエフェクトのブロックを削除
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showMap) {
@@ -144,7 +148,6 @@ struct GachaResultCard: View {
             .font(.system(size: 15, weight: .semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            // 背景色も元に戻す
             .background(Color(.secondarySystemBackground))
             .cornerRadius(10)
     }

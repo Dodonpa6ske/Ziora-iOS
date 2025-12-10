@@ -69,8 +69,6 @@ struct HomeView: View {
     
     private let gachaCardHeight: CGFloat = 520
     
-    
-    
     var body: some View {
         ZStack {
             
@@ -92,7 +90,7 @@ struct HomeView: View {
                 // 上部ハンバーガー
                 HStack {
                     Button {
-                        // メニュー表示アニメーション（スプリング等はお好みで）
+                        // メニュー表示アニメーション
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             showMenu = true
                         }
@@ -142,7 +140,7 @@ struct HomeView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { gachaImage = nil }
                     }
                 
-                // ★修正: 上下のSpacerで挟んで、地球の位置に合わせて中央配置
+                // 中央配置
                 VStack {
                     Spacer() // 上の余白
                     
@@ -151,22 +149,34 @@ struct HomeView: View {
                             GachaCardShell { NativeAdCardView(adUnitID: testNativeAdUnitID) }
                         } else if let image = gachaImage {
                             GachaResultCard(
-                                image: image, country: gachaCountry, region: gachaRegion, city: gachaCity,
-                                dateText: gachaDateText, latitude: gachaLatitude, longitude: gachaLongitude,
-                                photoId: gachaPhotoId, imagePath: gachaImagePath
+                                image: image,
+                                country: gachaCountry,
+                                region: gachaRegion,
+                                city: gachaCity,
+                                dateText: gachaDateText,
+                                latitude: gachaLatitude,
+                                longitude: gachaLongitude,
+                                photoId: gachaPhotoId,
+                                imagePath: gachaImagePath
                             )
                         }
                     }
                     .frame(height: gachaCardHeight)
                     .padding(.horizontal, 24)
                     
-                    Spacer() // 下の余白（これで垂直中央になります）
+                    Spacer() // 下の余白
                 }
-                // 地球が下のメニュー分(140pt)空けて少し上にいるので、カードも視覚的な中心に合わせて少し上げます
                 .offset(y: -40)
-                .scaleEffect(showGachaCard ? 1.0 : 0.7)
-                .opacity(showGachaCard ? 1.0 : 0.0)
-                .transition(.asymmetric(insertion: .scale(scale: 0.7).combined(with: .opacity), removal: .scale(scale: 0.95).combined(with: .opacity)))
+                // 0%から飛び出すポップアップトランジション（設定は維持）
+                .transition(.asymmetric(
+                    insertion: .modifier(
+                        active: PopUpModifier(scale: 0.0, opacity: 0),
+                        identity: PopUpModifier(scale: 1.0, opacity: 1)
+                    ),
+                    removal: .scale(scale: 0.8).combined(with: .opacity)
+                ))
+                // ★修正: 速度(response)を0.3に速め、バネ(dampingFraction)を0.7に抑える
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showGachaCard)
             }
             
             // 撮影プレビュー
@@ -206,13 +216,12 @@ struct HomeView: View {
             
             // ===== ハンバーガーメニュー =====
             if showMenu {
-                // 背景の暗転（タップで閉じる）
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
                     .onTapGesture {
                         withAnimation(.easeIn(duration: 0.22)) { showMenu = false }
                     }
-                    .transition(.opacity) // 背景はフワッと消える
+                    .transition(.opacity)
                 
                 HStack {
                     HamburgerMenuView(
@@ -239,13 +248,12 @@ struct HomeView: View {
                         }
                     )
                     .frame(width: 320)
-                    // ★ 変更: .offset を削除し、transition で左からのスライドインを指定
                     .transition(.move(edge: .leading))
                     
                     Spacer()
                 }
                 .ignoresSafeArea()
-                .zIndex(2) // 最前面に表示
+                .zIndex(2)
             }
         }
         .onReceive(locationManager.$lastPlacemark) { placemark in
@@ -277,30 +285,17 @@ struct HomeView: View {
         .sheet(isPresented: $showSentList) { NavigationStack { SentListView() } }
         .sheet(isPresented: $showAdFreeSheet) { AdFreePlanView() }
         
-        // ===== アラート群 =====
         .alert("Sign Out", isPresented: $showSignOutAlert) {
-            Button("Sign Out", role: .destructive) {
-                try? AuthManager.shared.signOut()
-            }
+            Button("Sign Out", role: .destructive) { try? AuthManager.shared.signOut() }
             Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Are you sure you want to sign out?")
-        }
+        } message: { Text("Are you sure you want to sign out?") }
         .alert("Delete Account", isPresented: $showDeleteAccountAlert) {
-            Button("Delete", role: .destructive) {
-                Task {
-                    try? await AuthManager.shared.deleteAccount()
-                }
-            }
+            Button("Delete", role: .destructive) { Task { try? await AuthManager.shared.deleteAccount() } }
             Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This action cannot be undone. All your data will be permanently deleted.")
-        }
+        } message: { Text("This action cannot be undone. All your data will be permanently deleted.") }
         .alert("Error", isPresented: Binding(get: { uploadErrorMessage != nil || gachaErrorMessage != nil }, set: { _ in uploadErrorMessage = nil; gachaErrorMessage = nil })) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(uploadErrorMessage ?? gachaErrorMessage ?? "")
-        }
+        } message: { Text(uploadErrorMessage ?? gachaErrorMessage ?? "") }
         .preferredColorScheme(.light)
     }
     
@@ -309,16 +304,9 @@ struct HomeView: View {
         let email = "ziora.app.contact@gmail.com"
         let subject = "Ziora Support"
         let body = "Please describe your issue or feedback here."
-        
-        let urlString = "mailto:\(email)?subject=\(subject)&body=\(body)"
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        
-        if let url = URL(string: urlString) {
-            if UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url)
-            } else {
-                print("Cannot open mail client")
-            }
+        let urlString = "mailto:\(email)?subject=\(subject)&body=\(body)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        if let url = URL(string: urlString), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
         }
     }
     
@@ -336,15 +324,8 @@ struct HomeView: View {
         isUploading = false
     }
     
-    // ★ 修正: 自動修復機能付きガチャ
-    // retryCount引数を追加（デフォルト0）
     private func performGacha(expectedSpinDuration: TimeInterval, retryCount: Int = 0) async {
-        // 無限ループ防止のため、リトライは3回まで
-        guard retryCount < 3 else {
-            isGachaLoading = false
-            return
-        }
-        
+        guard retryCount < 3 else { isGachaLoading = false; return }
         guard !isGachaLoading, !showPreviewCard else { return }
         isGachaLoading = true
         gachaCount += 1
@@ -363,7 +344,8 @@ struct HomeView: View {
             let delay = max(0, expectedSpinDuration - 0.15)
             if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
             DispatchQueue.main.async {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) { showGachaCard = true }
+                // ★修正: こちらも合わせて調整 (response: 0.3, dampingFraction: 0.7)
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { showGachaCard = true }
                 let generator = UIImpactFeedbackGenerator(style: .medium); generator.impactOccurred()
             }
             isGachaLoading = false
@@ -377,13 +359,7 @@ struct HomeView: View {
                 isGachaLoading = false; return
             }
             
-            // 削除・リトライ時に使うため情報を保持
-            gachaLatitude = doc.latitude
-            gachaLongitude = doc.longitude
-            gachaPhotoId = doc.id
-            gachaImagePath = doc.imagePath
-            
-            // ★ ここで画像がない(404)とエラーになる
+            gachaLatitude = doc.latitude; gachaLongitude = doc.longitude; gachaPhotoId = doc.id; gachaImagePath = doc.imagePath
             let image = try await PhotoService.shared.downloadImage(imagePath: doc.imagePath)
             
             let elapsed = Date().timeIntervalSince(startTime)
@@ -393,44 +369,40 @@ struct HomeView: View {
             let dateString = doc.createdAt.map { DateFormatter.zioraDisplay.string(from: $0.dateValue()) } ?? ""
             
             DispatchQueue.main.async {
-                gachaCountry = doc.country
-                gachaRegion = doc.region
-                gachaCity = doc.city
-                gachaDateText = dateString
-                gachaLatitude = doc.latitude
-                gachaLongitude = doc.longitude
-                gachaImage = image
-                
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) { showGachaCard = true }
+                gachaCountry = doc.country; gachaRegion = doc.region; gachaCity = doc.city; gachaDateText = dateString; gachaImage = image
+                // ★修正: こちらも合わせて調整 (response: 0.3, dampingFraction: 0.7)
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { showGachaCard = true }
                 let generator = UIImpactFeedbackGenerator(style: .medium); generator.impactOccurred()
             }
-            // 成功時はローディング終了
             isGachaLoading = false
             
         } catch {
-            // ★ エラーハンドリング強化: ゾンビデータ検出＆自動修復
             print("Gacha Error: \(error)")
-            
             let nsError = error as NSError
-            // Storageエラーコード -13010: Object does not exist
             let isNotFound = nsError.domain == "FIRStorageErrorDomain" && nsError.code == -13010
             let isNotExistMsg = error.localizedDescription.contains("does not exist")
             
             if isNotFound || isNotExistMsg {
                 print("⚠️ ゾンビデータ検出: \(gachaPhotoId)。削除してリトライします。")
-                
-                // Firestoreから削除（Storageになくても念の為呼ぶ）
                 try? await PhotoService.shared.deletePhoto(documentId: gachaPhotoId, imagePath: gachaImagePath)
-                
-                // フラグをリセットして再試行（スピン時間は少し短くして違和感を減らす）
                 isGachaLoading = false
                 await performGacha(expectedSpinDuration: 0.5, retryCount: retryCount + 1)
                 return
             }
-            
-            // 通常エラー（ネットワークエラー等）
             DispatchQueue.main.async { gachaErrorMessage = error.localizedDescription }
             isGachaLoading = false
         }
+    }
+}
+
+// 0% -> 100% (spring効果で少しだけ大きく弾んで戻る)
+struct PopUpModifier: ViewModifier {
+    let scale: CGFloat
+    let opacity: Double
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(scale)
+            .opacity(opacity)
     }
 }
