@@ -38,13 +38,22 @@ struct GachaResultCard: View {
     let photoId: String
     let imagePath: String
     
-    // ★追加: いいね数と、ボタンを表示するかどうかのフラグ
+    // ブロック機能のために投稿者のIDが必要
+    var userId: String? = nil
+    
+    // いいね数と、ボタンを表示するかどうかのフラグ
     let likeCount: Int
     var showLikeButton: Bool = true
 
     @ObservedObject private var likedStore = LikedPhotoStore.shared
     
     @State private var mapDestination: MapDestination?
+    
+    // アラート制御用
+    @State private var showReportConfirmation = false
+    @State private var showBlockConfirmation = false
+    @State private var showThankYouMessage = false
+    @State private var showBlockCompleteMessage = false
 
     var body: some View {
         ZStack {
@@ -65,6 +74,39 @@ struct GachaResultCard: View {
                     .cornerRadius(20)
                     .padding(.top, 10)
                     .padding(.horizontal, 10)
+                    // 右上のメニューボタン
+                    .overlay(alignment: .topTrailing) {
+                        if showLikeButton {
+                            Menu {
+                                // 通報ボタン
+                                Button(role: .destructive) {
+                                    showReportConfirmation = true
+                                } label: {
+                                    Label("Report Inappropriate", systemImage: "exclamationmark.bubble")
+                                }
+                                
+                                // ブロックボタン (userIdがある場合のみ)
+                                if userId != nil {
+                                    Button(role: .destructive) {
+                                        showBlockConfirmation = true
+                                    } label: {
+                                        Label("Block this User", systemImage: "hand.raised.fill")
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    // 背景の主張を抑える（透明度30%）
+                                    .background(Color.black.opacity(0.2))
+                                    .clipShape(Circle())
+                            }
+                            // 右端3px, 上3pxの位置へ
+                            .padding(.trailing, 13)
+                            .padding(.top, 15)
+                        }
+                    }
                 
                 // 2. 下部情報エリア
                 VStack(alignment: .leading, spacing: 8) {
@@ -119,7 +161,7 @@ struct GachaResultCard: View {
                         
                         Spacer()
                         
-                        // ★修正: showLikeButton フラグで分岐
+                        // showLikeButton フラグで分岐
                         if showLikeButton {
                             // いいねボタン (他人の写真用)
                             LikeButton(
@@ -166,8 +208,39 @@ struct GachaResultCard: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // ★修正ポイント: ここに追加！
+        // これにより、カード全体（オーバーレイ含む）が1つのレイヤーとして合成され、
+        // 不透明度変更などのアニメーション時にボタンだけが残る現象を防げます。
+        .compositingGroup()
+        
         .sheet(item: $mapDestination) { destination in
             LocationMapView(searchQuery: destination.query)
+        }
+        // 通報ダイアログ
+        .confirmationDialog("Report this photo?", isPresented: $showReportConfirmation, titleVisibility: .visible) {
+            Button("Inappropriate Content") { submitReport(reason: "Inappropriate Content") }
+            Button("Spam or Scam") { submitReport(reason: "Spam or Scam") }
+            Button("Cancel", role: .cancel) {}
+        }
+        // ブロック確認ダイアログ
+        .confirmationDialog("Block this user?", isPresented: $showBlockConfirmation, titleVisibility: .visible) {
+            Button("Block", role: .destructive) {
+                if let uid = userId { submitBlock(targetUserId: uid) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You will no longer see photos from this user.")
+        }
+        // 完了アラート
+        .alert("Report Sent", isPresented: $showThankYouMessage) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Thank you for your report. We will review this content shortly.")
+        }
+        .alert("Blocked", isPresented: $showBlockCompleteMessage) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("This user has been blocked.")
         }
     }
     
@@ -182,5 +255,37 @@ struct GachaResultCard: View {
             .padding(.vertical, 6)
             .background(Color(.secondarySystemBackground))
             .cornerRadius(10)
+    }
+    
+    // 通報処理
+    private func submitReport(reason: String) {
+        Task {
+            do {
+                try await PhotoService.shared.reportPhoto(photoId: photoId, reason: reason)
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    showThankYouMessage = true
+                }
+            } catch {
+                print("Failed to report: \(error)")
+            }
+        }
+    }
+    
+    // ブロック処理
+    private func submitBlock(targetUserId: String) {
+        Task {
+            do {
+                try await PhotoService.shared.blockUser(blockedUserId: targetUserId)
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    showBlockCompleteMessage = true
+                }
+            } catch {
+                print("Failed to block: \(error)")
+            }
+        }
     }
 }

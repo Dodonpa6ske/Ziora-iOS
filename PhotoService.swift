@@ -527,5 +527,36 @@ final class PhotoService {
         }
         return existingIds
     }
+    
+    // MARK: - Report & Block (★ 追加・修正)
+
+    /// 不適切なコンテンツを通報する
+    func reportPhoto(photoId: String, reason: String) async throws {
+        guard let user = Auth.auth().currentUser else { return }
+        
+        let reportData: [String: Any] = [
+            "photoId": photoId,
+            "reporterId": user.uid,
+            "reason": reason,
+            "createdAt": FieldValue.serverTimestamp(),
+            "status": "pending"
+        ]
+        
+        try await db.collection("reports").addDocument(data: reportData)
+    }
+    
+    /// ユーザーをブロックする
+    func blockUser(blockedUserId: String) async throws {
+        guard let user = Auth.auth().currentUser else { return }
+        
+        let blockData: [String: Any] = [
+            "blockedUserId": blockedUserId,
+            "createdAt": FieldValue.serverTimestamp()
+        ]
+        
+        // 自分のサブコレクション `blocked_users` に追加
+        try await db.collection("users").document(user.uid)
+            .collection("blocked_users").document(blockedUserId).setData(blockData)
+    }
 
 } // ← クラスの閉じカッコ
