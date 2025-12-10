@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import MapKit // MKCoordinateSpanのために必要
 
 // MARK: - Custom Button Style (沈み込み + ハプティクス)
 
@@ -22,9 +21,6 @@ struct LocationPillButtonStyle: ButtonStyle {
 struct MapDestination: Identifiable {
     let id = UUID()
     let query: String
-    // ★追加: 直接座標指定用
-    var coordinate: CLLocationCoordinate2D? = nil
-    var span: MKCoordinateSpan? = nil
 }
 
 // MARK: - Main Card View
@@ -38,8 +34,13 @@ struct GachaResultCard: View {
     let latitude: Double?
     let longitude: Double?
 
+    /// いいね識別用
     let photoId: String
     let imagePath: String
+    
+    // ★追加: いいね数と、ボタンを表示するかどうかのフラグ
+    let likeCount: Int
+    var showLikeButton: Bool = true
 
     @ObservedObject private var likedStore = LikedPhotoStore.shared
     
@@ -47,12 +48,15 @@ struct GachaResultCard: View {
 
     var body: some View {
         ZStack {
+            // 背景
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.white)
                 .shadow(color: Color.black.opacity(0.18),
                         radius: 18, x: 0, y: 10)
 
+            // コンテンツ
             VStack(spacing: 0) {
+                // 1. 画像エリア
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -62,51 +66,29 @@ struct GachaResultCard: View {
                     .padding(.top, 10)
                     .padding(.horizontal, 10)
                 
+                // 2. 下部情報エリア
                 VStack(alignment: .leading, spacing: 8) {
                     
+                    // 上段: 位置情報タグ
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
-                            
-                            // Country Button (地名検索)
                             if !country.isEmpty {
-                                Button {
-                                    openMap(for: country)
-                                } label: {
-                                    pill(country)
-                                }
-                                .buttonStyle(LocationPillButtonStyle())
+                                Button { openMap(for: country) } label: { pill(country) }
+                                    .buttonStyle(LocationPillButtonStyle())
                             }
-                            
-                            // Region Button (地名検索)
                             if !region.isEmpty {
                                 Button {
                                     let query = [region, country].filter { !$0.isEmpty }.joined(separator: ", ")
                                     openMap(for: query)
-                                } label: {
-                                    pill(region)
-                                }
-                                .buttonStyle(LocationPillButtonStyle())
+                                } label: { pill(region) }
+                                    .buttonStyle(LocationPillButtonStyle())
                             }
-                            
-                            // City Button (★修正: 座標への直接ジャンプ)
                             if !city.isEmpty {
                                 Button {
-                                    if let lat = latitude, let lon = longitude {
-                                        // 座標がある場合は直接その場所へ (ズームレベル 0.05 程度)
-                                        openMapWithCoordinate(
-                                            name: city,
-                                            coord: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                                            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                                        )
-                                    } else {
-                                        // 座標がない場合のフォールバック（地名検索）
-                                        let query = [city, region, country].filter { !$0.isEmpty }.joined(separator: ", ")
-                                        openMap(for: query)
-                                    }
-                                } label: {
-                                    pill(city)
-                                }
-                                .buttonStyle(LocationPillButtonStyle())
+                                    let query = [city, region, country].filter { !$0.isEmpty }.joined(separator: ", ")
+                                    openMap(for: query)
+                                } label: { pill(city) }
+                                    .buttonStyle(LocationPillButtonStyle())
                             }
                         }
                         .padding(.horizontal, 16)
@@ -122,7 +104,10 @@ struct GachaResultCard: View {
                     .padding(.horizontal, -16)
 
                     
+                    // 下段: 撮影日時 + いいねボタン(または数)
                     HStack(alignment: .center) {
+                        
+                        // 撮影日時
                         HStack(spacing: 6) {
                             Image(systemName: "clock")
                                 .font(.system(size: 12))
@@ -134,29 +119,44 @@ struct GachaResultCard: View {
                         
                         Spacer()
                         
-                        LikeButton(
-                            isLiked: Binding(
-                                get: { likedStore.isLiked(id: photoId) },
-                                set: { newValue in
-                                    if newValue {
-                                        let lp = LikedPhoto(
-                                            id: photoId,
-                                            imagePath: imagePath,
-                                            country: country,
-                                            region: region,
-                                            city: city,
-                                            dateText: dateText,
-                                            latitude: latitude,
-                                            longitude: longitude
-                                        )
-                                        likedStore.add(photo: lp, image: image)
-                                        Task { await PhotoService.shared.sendLike(photoId: photoId) }
-                                    } else {
-                                        likedStore.remove(id: photoId)
+                        // ★修正: showLikeButton フラグで分岐
+                        if showLikeButton {
+                            // いいねボタン (他人の写真用)
+                            LikeButton(
+                                isLiked: Binding(
+                                    get: { likedStore.isLiked(id: photoId) },
+                                    set: { newValue in
+                                        if newValue {
+                                            let lp = LikedPhoto(
+                                                id: photoId,
+                                                imagePath: imagePath,
+                                                country: country,
+                                                region: region,
+                                                city: city,
+                                                dateText: dateText,
+                                                latitude: latitude,
+                                                longitude: longitude
+                                            )
+                                            likedStore.add(photo: lp, image: image)
+                                            Task { await PhotoService.shared.sendLike(photoId: photoId) }
+                                        } else {
+                                            likedStore.remove(id: photoId)
+                                        }
                                     }
-                                }
+                                )
                             )
-                        )
+                        } else {
+                            // いいね数のみ表示 (自分の写真用: グレー表示で操作不可)
+                            HStack(spacing: 4) {
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("\(likeCount)")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(.secondary) // グレーにする
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                        }
                     }
                     .offset(y: -8)
                 }
@@ -167,24 +167,12 @@ struct GachaResultCard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(item: $mapDestination) { destination in
-            LocationMapView(
-                searchQuery: destination.query,
-                initialCoordinate: destination.coordinate, // 座標渡し
-                initialSpan: destination.span              // ズームレベル渡し
-            )
+            LocationMapView(searchQuery: destination.query)
         }
     }
     
-    // 地名検索で開く
     private func openMap(for query: String) {
-        print("🗺️ Opening map by query: \(query)")
         self.mapDestination = MapDestination(query: query)
-    }
-    
-    // ★追加: 座標指定で開く
-    private func openMapWithCoordinate(name: String, coord: CLLocationCoordinate2D, span: MKCoordinateSpan) {
-        print("📍 Opening map by coordinate: \(coord.latitude), \(coord.longitude)")
-        self.mapDestination = MapDestination(query: name, coordinate: coord, span: span)
     }
 
     private func pill(_ text: String) -> some View {

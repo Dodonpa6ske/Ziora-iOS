@@ -196,7 +196,10 @@ struct LikedListView: View {
                         latitude: photo.latitude,
                         longitude: photo.longitude,
                         photoId: photo.id,
-                        imagePath: photo.imagePath
+                        imagePath: photo.imagePath,
+                        // ★修正: 引数を追加
+                        likeCount: 0,        // ボタン表示時は使われないので0でOK
+                        showLikeButton: true // いいねボタンを表示（解除可能にするため）
                     )
                     .frame(height: 520)
                     .scaleEffect(cardScale)
@@ -279,4 +282,3 @@ struct LikedListView: View {
         }
     }
 }
-

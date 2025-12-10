@@ -148,18 +148,20 @@ struct HomeView: View {
                         if showAdThisTime {
                             GachaCardShell { NativeAdCardView(adUnitID: testNativeAdUnitID) }
                         } else if let image = gachaImage {
-                            GachaResultCard(
-                                image: image,
-                                country: gachaCountry,
-                                region: gachaRegion,
-                                city: gachaCity,
-                                dateText: gachaDateText,
-                                latitude: gachaLatitude,
-                                longitude: gachaLongitude,
-                                photoId: gachaPhotoId,
-                                imagePath: gachaImagePath
-                            )
-                        }
+                                                    GachaResultCard(
+                                                        image: image,
+                                                        country: gachaCountry,
+                                                        region: gachaRegion,
+                                                        city: gachaCity,
+                                                        dateText: gachaDateText,
+                                                        latitude: gachaLatitude,
+                                                        longitude: gachaLongitude,
+                                                        photoId: gachaPhotoId,
+                                                        imagePath: gachaImagePath,
+                                                        likeCount: 0,
+                                                        showLikeButton: true
+                                                    )
+                                                }
                     }
                     .frame(height: gachaCardHeight)
                     .padding(.horizontal, 24)
