@@ -32,15 +32,15 @@ struct PhotoDocument {
     let randomSeed: Double
     let status: String
     let likeCount: Int
-    let dateText: String?      // 追加フィールド（ない古いデータも考えて Optional）
+    let dateText: String?      // 追加フィールド
 }
 
 /// ガチャの範囲指定
 enum GachaScope {
     case global
-    case country(code: String)                  // 例: "JP"
-    case region(code: String, region: String)   // 例: ("JP", "Osaka")
-    case city(code: String, city: String)       // 例: ("JP", "Osaka")
+    case country(code: String)
+    case region(code: String, region: String)
+    case city(code: String, city: String)
 }
 
 // MARK: - PhotoService
@@ -51,6 +51,9 @@ final class PhotoService {
 
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
+    
+    // 画像キャッシュ
+    private let imageCache = NSCache<NSString, UIImage>()
 
     private init() {}
 
@@ -59,16 +62,29 @@ final class PhotoService {
         let imagePath: String
     }
 
-    enum UploadError: LocalizedError {
+    // ★追加: アプリ独自のエラー定義
+    enum ZioraError: LocalizedError {
         case notSignedIn
-        case couldNotEncodeJPEG
+        case offline
+        case imageProcessingFailed
+        case noData
+        case serverError(String)
+        case unknown
 
         var errorDescription: String? {
             switch self {
             case .notSignedIn:
-                return "You need to be signed in to upload."
-            case .couldNotEncodeJPEG:
-                return "Could not prepare image for upload."
+                return "Please sign in to continue."
+            case .offline:
+                return "No internet connection. Please check your network settings."
+            case .imageProcessingFailed:
+                return "Failed to process the image."
+            case .noData:
+                return "Content not found."
+            case .serverError(let msg):
+                return "Server Error: \(msg)"
+            case .unknown:
+                return "An unknown error occurred."
             }
         }
     }
@@ -76,19 +92,20 @@ final class PhotoService {
     // MARK: - Upload
 
     /// 位置情報付きで写真をアップロードし、Firestore にメタを保存
-    ///
-    /// - Parameters:
-    ///   - image: 撮影した UIImage
-    ///   - meta: 位置情報などのメタデータ
     func uploadPhoto(image: UIImage, meta: PhotoMeta) async throws -> UploadedPhotoMeta {
-        // 1. ユーザー確認（匿名ログインでも OK）
+        // ★追加: ネットワークチェック
+        guard NetworkMonitor.shared.isConnected else {
+            throw ZioraError.offline
+        }
+        
+        // 1. ユーザー確認
         guard let user = Auth.auth().currentUser else {
-            throw UploadError.notSignedIn
+            throw ZioraError.notSignedIn
         }
 
         // 2. JPEG データに変換
         guard let data = image.jpegData(compressionQuality: 0.9) else {
-            throw UploadError.couldNotEncodeJPEG
+            throw ZioraError.imageProcessingFailed
         }
 
         // 3. Firestore のドキュメント参照を先に作る
@@ -99,28 +116,28 @@ final class PhotoService {
         let imagePath = "photos/\(user.uid)/\(photoId).jpg"
         let storageRef = storage.reference(withPath: imagePath)
 
-        // 4. Storage にアップロード
+        // 4. Storage にアップロード (エラーハンドリング追加)
         let metadata = StorageMetadata()
         metadata.contentType = "image/jpeg"
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            storageRef.putData(data, metadata: metadata) { _, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ())
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                storageRef.putData(data, metadata: metadata) { _, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: ())
+                    }
                 }
             }
+        } catch {
+            throw ZioraError.serverError("Failed to upload image: \(error.localizedDescription)")
         }
 
-        // 5. Firestore にメタデータ保存
+        // 5. Firestore にメタデータ保存 (エラーハンドリング追加)
         let now = FieldValue.serverTimestamp()
-        
-        // ★ 追加：7日後の日時を計算（86400秒 × 7日）
-        // serverTimestamp() とは別に、具体的な日付オブジェクトを作って渡す必要があります
         let expireDate = Date().addingTimeInterval(7 * 24 * 60 * 60)
         let expireTimestamp = Timestamp(date: expireDate)
-
         let randomSeed = Double.random(in: 0..<1)
 
         var payload: [String: Any] = [
@@ -130,7 +147,7 @@ final class PhotoService {
             "region":      meta.region,
             "city":        meta.city,
             "createdAt":   now,
-            "expireAt":    expireTimestamp, // 👈 🔴 これを追加！
+            "expireAt":    expireTimestamp,
             "randomSeed":  randomSeed,
             "status":      "active",
             "likeCount":   0,
@@ -147,13 +164,16 @@ final class PhotoService {
             payload["longitude"] = lng
         }
 
-        try await docRef.setData(payload)
+        do {
+            try await docRef.setData(payload)
+        } catch {
+            throw ZioraError.serverError("Failed to save metadata: \(error.localizedDescription)")
+        }
 
         return UploadedPhotoMeta(id: photoId, imagePath: imagePath)
     }
 
     /// 旧バージョン互換用：位置情報なしアップロード
-    /// HomeView 側が完全に新しい meta を渡すようになったら不要になる想定
     func uploadPhoto(image: UIImage) async throws -> UploadedPhotoMeta {
         let dummy = PhotoMeta(
             country: "Unknown",
@@ -171,6 +191,11 @@ final class PhotoService {
 
     /// ランダムに 1 枚写真を取得（世界 or エリア別）
     func fetchRandomPhoto(scope: GachaScope) async throws -> PhotoDocument? {
+        // ★追加: ネットワークチェック
+        guard NetworkMonitor.shared.isConnected else {
+            throw ZioraError.offline
+        }
+
         var query: Query = db.collection("photos")
             .whereField("status", isEqualTo: "active")
 
@@ -193,51 +218,53 @@ final class PhotoService {
         // ランダムな起点
         let seed = Double.random(in: 0..<1)
 
-        // まず「seed 以上」から 1 件
-        var snapshot = try await getRandomSnapshot(
-            baseQuery: query,
-            seed: seed,
-            searchDirection: .forward
-        )
-
-        // 足りなければ「seed 未満」から
-        if snapshot?.documents.isEmpty ?? true {
-            snapshot = try await getRandomSnapshot(
+        // エラーをキャッチして ZioraError に変換
+        do {
+            // まず「seed 以上」から 1 件
+            var snapshot = try await getRandomSnapshot(
                 baseQuery: query,
                 seed: seed,
-                searchDirection: .backward
+                searchDirection: .forward
             )
+
+            // 足りなければ「seed 未満」から
+            if snapshot?.documents.isEmpty ?? true {
+                snapshot = try await getRandomSnapshot(
+                    baseQuery: query,
+                    seed: seed,
+                    searchDirection: .backward
+                )
+            }
+
+            guard
+                let doc = snapshot?.documents.first,
+                let randomSeed = doc.data()["randomSeed"] as? Double
+            else {
+                return nil // 写真が0枚の場合はエラーではなくnil
+            }
+
+            let data = doc.data()
+            let likeCount = data["likeCount"] as? Int ?? 0
+
+            return PhotoDocument(
+                id: doc.documentID,
+                userId: data["userId"] as? String ?? "",
+                imagePath: data["imagePath"] as? String ?? "",
+                country: data["country"] as? String ?? "",
+                region: data["region"] as? String ?? "",
+                city: data["city"] as? String ?? "",
+                countryCode: data["countryCode"] as? String,
+                latitude: data["latitude"] as? Double,
+                longitude: data["longitude"] as? Double,
+                createdAt: data["createdAt"] as? Timestamp,
+                randomSeed: randomSeed,
+                status: data["status"] as? String ?? "active",
+                likeCount: likeCount,
+                dateText: data["dateText"] as? String
+            )
+        } catch {
+            throw ZioraError.serverError(error.localizedDescription)
         }
-
-        guard
-            let doc = snapshot?.documents.first,
-            let randomSeed = doc.data()["randomSeed"] as? Double
-        else {
-            return nil
-        }
-
-        let data = doc.data()
-
-        let likeCount = data["likeCount"] as? Int ?? 0
-
-        let photo = PhotoDocument(
-            id: doc.documentID,
-            userId: data["userId"] as? String ?? "",
-            imagePath: data["imagePath"] as? String ?? "",
-            country: data["country"] as? String ?? "",
-            region: data["region"] as? String ?? "",
-            city: data["city"] as? String ?? "",
-            countryCode: data["countryCode"] as? String,
-            latitude: data["latitude"] as? Double,
-            longitude: data["longitude"] as? Double,
-            createdAt: data["createdAt"] as? Timestamp,
-            randomSeed: randomSeed,
-            status: data["status"] as? String ?? "active",
-            likeCount: likeCount,          // ★ 追加
-            dateText: data["dateText"] as? String
-        )
-
-        return photo
     }
 
     private enum RandomSearchDirection {
@@ -256,10 +283,8 @@ final class PhotoService {
 
         switch searchDirection {
         case .forward:
-            // seed 以上
             q = q.start(at: [seed])
         case .backward:
-            // 0〜seed の中から
             q = q.end(before: [seed])
         }
 
@@ -281,60 +306,73 @@ final class PhotoService {
 
     // MARK: - Storage から画像を取る
 
-    /// Firestore の imagePath から UIImage を取得
+    /// Firestore の imagePath から UIImage を取得 (キャッシュ対応)
     func downloadImage(imagePath: String) async throws -> UIImage {
+        // 1. キャッシュチェック
+        if let cached = imageCache.object(forKey: imagePath as NSString) {
+            return cached
+        }
+        
+        // 2. ★追加: ネットワークチェック（キャッシュがない場合のみ）
+        guard NetworkMonitor.shared.isConnected else {
+            throw ZioraError.offline
+        }
+
         let ref = storage.reference(withPath: imagePath)
         let maxSize: Int64 = 10 * 1024 * 1024
 
-        let data = try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Data, Error>) in
-            ref.getData(maxSize: maxSize) { data, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else if let data = data {
-                    continuation.resume(returning: data)
-                } else {
-                    continuation.resume(
-                        throwing: NSError(
-                            domain: "PhotoService",
-                            code: -1,
-                            userInfo: [NSLocalizedDescriptionKey: "No data"]
-                        )
-                    )
+        do {
+            let data = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+                ref.getData(maxSize: maxSize) { data, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else if let data = data {
+                        continuation.resume(returning: data)
+                    } else {
+                        continuation.resume(throwing: NSError(domain: "PhotoService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data"]))
+                    }
                 }
             }
+            
+            guard let image = UIImage(data: data) else {
+                throw ZioraError.imageProcessingFailed
+            }
+            
+            // 3. キャッシュ保存
+            imageCache.setObject(image, forKey: imagePath as NSString)
+            
+            return image
+            
+        } catch {
+            throw ZioraError.serverError("Image download failed: \(error.localizedDescription)")
         }
-
-        guard let image = UIImage(data: data) else {
-            throw NSError(
-                domain: "PhotoService",
-                code: -2,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid image data"]
-            )
-        }
-        return image
     }
     
     // MARK: - Thumbnail Download
 
-    /// サムネイル画像（200x200）をダウンロードする
-    /// ※ Firebase Extension "Resize Images" が導入されている前提
+    /// サムネイル画像（200x200）をダウンロードする (キャッシュ対応)
     func downloadThumbnail(originalPath: String) async throws -> UIImage {
-        // 拡張子 (.jpg) の前に "_200x200" を挿入する
-        // 例: photos/uid/abc.jpg -> photos/uid/abc_200x200.jpg
         let thumbPath: String
         if let dotRange = originalPath.range(of: ".", options: .backwards) {
             let base = originalPath[..<dotRange.lowerBound]
             let ext = originalPath[dotRange.lowerBound...]
             thumbPath = "\(base)_200x200\(ext)"
         } else {
-            // 万が一拡張子がない場合
             thumbPath = originalPath + "_200x200"
         }
 
-        let ref = storage.reference(withPath: thumbPath)
+        // 1. キャッシュチェック
+        if let cached = imageCache.object(forKey: thumbPath as NSString) {
+            return cached
+        }
         
-        // サムネイルは小さいので最大サイズは小さめでOK (例: 1MB)
+        // 2. ★追加: ネットワークチェック
+        guard NetworkMonitor.shared.isConnected else {
+            // オフライン時はフォールバックせずエラーにする（オリジナルを取りに行っても失敗するため）
+            throw ZioraError.offline
+        }
+
+        let ref = storage.reference(withPath: thumbPath)
         let maxSize: Int64 = 1 * 1024 * 1024
 
         do {
@@ -351,134 +389,118 @@ final class PhotoService {
             }
             
             if let image = UIImage(data: data) {
+                // 3. キャッシュ保存
+                imageCache.setObject(image, forKey: thumbPath as NSString)
                 return image
             } else {
-                throw NSError(domain: "PhotoService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
+                throw ZioraError.imageProcessingFailed
             }
         } catch {
-            // ★重要: サムネイル生成がまだ（アップ直後など）や、過去の画像でサムネイルがない場合は
-            // フォールバックとして「オリジナル画像」を取りに行く
             print("Thumbnail not found, falling back to original: \(thumbPath)")
             return try await downloadImage(imagePath: originalPath)
         }
     }
     
-    // MARK: - Fetch my photos (for sent list)
+    // MARK: - Fetch my photos (Pagination)
 
-    func fetchMyPhotos() async throws -> [PhotoDocument] {
+    func fetchMyPhotos(limit: Int = 20, lastSnapshot: DocumentSnapshot? = nil) async throws -> (photos: [PhotoDocument], lastSnapshot: DocumentSnapshot?) {
         guard let user = Auth.auth().currentUser else {
-            throw UploadError.notSignedIn
+            throw ZioraError.notSignedIn
         }
 
-        let query = db.collection("photos")
+        var query = db.collection("photos")
             .whereField("userId", isEqualTo: user.uid)
             .whereField("status", isEqualTo: "active")
             .order(by: "createdAt", descending: true)
+            .limit(to: limit)
+        
+        if let lastSnapshot = lastSnapshot {
+            query = query.start(afterDocument: lastSnapshot)
+        }
 
-        let snapshot = try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<QuerySnapshot, Error>) in
-            query.getDocuments { snap, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else if let snap = snap {
-                    continuation.resume(returning: snap)
+        // Firestoreのクエリはオフラインキャッシュが効くため、厳密なネットワークチェックは行わず
+        // 取得エラーのみをキャッチして ZioraError にラップします
+        do {
+            let snapshot = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<QuerySnapshot, Error>) in
+                query.getDocuments { snap, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else if let snap = snap {
+                        continuation.resume(returning: snap)
+                    }
                 }
             }
-        }
 
-        let photos = snapshot.documents.compactMap { doc -> PhotoDocument? in
-            let data = doc.data()
-            guard
-                let userId      = data["userId"]      as? String,
-                let imagePath   = data["imagePath"]   as? String,
-                let country     = data["country"]     as? String,
-                let region      = data["region"]      as? String,
-                let city        = data["city"]        as? String,
-                let randomSeed  = data["randomSeed"]  as? Double,
-                let status      = data["status"]      as? String
-            else {
-                return nil
+            let photos = snapshot.documents.compactMap { doc -> PhotoDocument? in
+                let data = doc.data()
+                guard
+                    let userId      = data["userId"]      as? String,
+                    let imagePath   = data["imagePath"]   as? String,
+                    let country     = data["country"]     as? String,
+                    let region      = data["region"]      as? String,
+                    let city        = data["city"]        as? String,
+                    let randomSeed  = data["randomSeed"]  as? Double,
+                    let status      = data["status"]      as? String
+                else { return nil }
+
+                let countryCode = data["countryCode"] as? String
+                let latitude    = data["latitude"]    as? Double
+                let longitude   = data["longitude"]   as? Double
+                let createdAt   = data["createdAt"]   as? Timestamp
+                let dateText    = data["dateText"]    as? String
+                let likeCount   = data["likeCount"]   as? Int ?? 0
+
+                return PhotoDocument(
+                    id: doc.documentID, userId: userId, imagePath: imagePath,
+                    country: country, region: region, city: city,
+                    countryCode: countryCode, latitude: latitude, longitude: longitude,
+                    createdAt: createdAt, randomSeed: randomSeed, status: status,
+                    likeCount: likeCount, dateText: dateText
+                )
             }
 
-            let countryCode = data["countryCode"] as? String
-            let latitude    = data["latitude"]    as? Double
-            let longitude   = data["longitude"]   as? Double
-            let createdAt   = data["createdAt"]   as? Timestamp
-            let dateText    = data["dateText"]    as? String
-
-            // ★ ここを追加（フィールドが無い古いデータは 0 にする）
-            let likeCount   = data["likeCount"]   as? Int ?? 0
-
-            return PhotoDocument(
-                id: doc.documentID,
-                userId: userId,
-                imagePath: imagePath,
-                country: country,
-                region: region,
-                city: city,
-                countryCode: countryCode,
-                latitude: latitude,
-                longitude: longitude,
-                createdAt: createdAt,
-                randomSeed: randomSeed,
-                status: status,
-                likeCount: likeCount,   // ★ ここ追加
-                dateText: dateText
-            )
+            return (photos, snapshot.documents.last)
+            
+        } catch {
+            throw ZioraError.serverError(error.localizedDescription)
         }
-
-        return photos
     }
 
     // MARK: - Delete photo (cancel sending)
 
     func deletePhoto(documentId: String, imagePath: String) async throws {
-        // Firestore のドキュメント削除
+        // Firestore削除
         let docRef = db.collection("photos").document(documentId)
-        try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Void, Error>) in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             docRef.delete { error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ())
-                }
+                if let error = error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: ()) }
             }
         }
 
-        // Storage 上の実ファイル削除
+        // Storage削除
         let ref = storage.reference(withPath: imagePath)
-        try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Void, Error>) in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             ref.delete { error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ())
-                }
+                if let error = error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: ()) }
             }
         }
     }
 
     // MARK: - Notification Support
 
-    /// 通知用にFCMトークンをユーザー情報として保存
     func saveFCMToken(_ token: String) {
         guard let user = Auth.auth().currentUser else { return }
-        
-        // users/{uid} ドキュメントにトークンを保存（なければ作成）
         db.collection("users").document(user.uid).setData([
             "fcmToken": token,
             "updatedAt": FieldValue.serverTimestamp()
         ], merge: true)
     }
 
-    /// 「いいね」情報をFirestoreに送信（これが通知のトリガーになります）
     func sendLike(photoId: String) async {
         guard let user = Auth.auth().currentUser else { return }
         
-        // photos/{photoId}/likes/{myUserId} という場所にデータを書き込む
-        // Cloud Functions がこの書き込みを検知して通知を送ります
         let likeRef = db.collection("photos").document(photoId)
                         .collection("likes").document(user.uid)
         
@@ -487,8 +509,6 @@ final class PhotoService {
                 "likerId": user.uid,
                 "createdAt": FieldValue.serverTimestamp()
             ])
-            
-            // ついでに写真本体のいいね数もカウントアップ（表示用）
             try await db.collection("photos").document(photoId).updateData([
                 "likeCount": FieldValue.increment(Int64(1))
             ])
@@ -499,12 +519,9 @@ final class PhotoService {
 
     // MARK: - Validation
 
-    /// 指定されたIDの写真がFirestore上に存在するか確認し、存在するIDのみを返す
-    /// (送信者によって削除された写真を検知するため)
     func validateExistence(ids: [String]) async -> [String] {
         var existingIds: [String] = []
         
-        // 並行処理で効率的にチェック
         await withTaskGroup(of: String?.self) { group in
             for id in ids {
                 group.addTask {
@@ -514,8 +531,7 @@ final class PhotoService {
                         let snap = try await docRef.getDocument(source: .server)
                         return snap.exists ? id : nil
                     } catch {
-                        // オフラインやエラー時は勝手に消さないように「存在する」扱いとして返す（安全策）
-                        // print("Validation error (offline?): \(error)")
+                        // オフラインやエラー時は勝手に消さないように「存在する」扱いとして返す
                         return id
                     }
                 }
@@ -528,9 +544,8 @@ final class PhotoService {
         return existingIds
     }
     
-    // MARK: - Report & Block (★ 追加・修正)
+    // MARK: - Report & Block
 
-    /// 不適切なコンテンツを通報する
     func reportPhoto(photoId: String, reason: String) async throws {
         guard let user = Auth.auth().currentUser else { return }
         
@@ -545,7 +560,6 @@ final class PhotoService {
         try await db.collection("reports").addDocument(data: reportData)
     }
     
-    /// ユーザーをブロックする
     func blockUser(blockedUserId: String) async throws {
         guard let user = Auth.auth().currentUser else { return }
         
@@ -554,7 +568,6 @@ final class PhotoService {
             "createdAt": FieldValue.serverTimestamp()
         ]
         
-        // 自分のサブコレクション `blocked_users` に追加
         try await db.collection("users").document(user.uid)
             .collection("blocked_users").document(blockedUserId).setData(blockData)
     }

@@ -5,8 +5,7 @@ import UniformTypeIdentifiers
 import FirebaseAuth
 import FirebaseFirestore
 
-// 開発中はテスト用 ID を使う
-let testNativeAdUnitID = "ca-app-pub-3940256099942544/3986624511"
+let testNativeAdUnitID = "ca-app-pub-9291029167690966/8530992058"
 
 struct HomeView: View {
     // Navigation handlers
@@ -66,6 +65,9 @@ struct HomeView: View {
     @State private var showAdThisTime = false
     
     @StateObject private var interactionState = InteractionState()
+    
+    // ★追加: ネットワーク監視
+    @StateObject private var networkMonitor = NetworkMonitor.shared
     
     private let gachaCardHeight: CGFloat = 520
     
@@ -340,6 +342,12 @@ struct HomeView: View {
     }
     
     private func uploadCurrentPhoto() async {
+        // ★追加: ネットワークチェック (PhotoService側でもチェックしていますが、UX向上のためここでも弾きます)
+        guard networkMonitor.isConnected else {
+            uploadErrorMessage = "No internet connection."
+            return
+        }
+
         guard !isUploading, let image = capturedImage else { return }
         isUploading = true
         let loc = locationManager.lastLocation
@@ -354,6 +362,12 @@ struct HomeView: View {
     }
     
     private func performGacha(expectedSpinDuration: TimeInterval, retryCount: Int = 0) async {
+        // ★追加: ネットワークチェック
+        guard networkMonitor.isConnected else {
+            gachaErrorMessage = "No internet connection."
+            return
+        }
+
         guard retryCount < 3 else { isGachaLoading = false; return }
         guard !isGachaLoading, !showPreviewCard else { return }
         isGachaLoading = true

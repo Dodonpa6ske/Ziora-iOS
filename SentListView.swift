@@ -58,7 +58,7 @@ struct SentThumbnailView: View {
             .onAppear {
                 withAnimation(
                     .spring(response: 0.55, dampingFraction: 0.85)
-                        .delay(Double(index) * 0.12)
+                        .delay(Double(index % 20) * 0.05) // ページネーション用にディレイ計算を少し調整
                 ) {
                     appeared = true
                 }
@@ -76,6 +76,10 @@ struct SentListView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var successMessage: String?
+    
+    // ★追加: ページネーション用
+    @State private var lastSnapshot: DocumentSnapshot? = nil
+    @State private var isFinished = false
 
     @State private var selectedPhoto: SentPhoto?
     @State private var cardScale: CGFloat = 0.9
@@ -96,7 +100,7 @@ struct SentListView: View {
                 if isLoading && photos.isEmpty {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if photos.isEmpty {
+                } else if photos.isEmpty && isFinished { // ★変更: 読み込み完了時のみ表示
                     Text("No uploaded photos yet")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -124,10 +128,24 @@ struct SentListView: View {
                                         cardScale = 1.0
                                     }
                                 }
+                                // ★追加: 最後のアイテムが表示されたら次を読み込む
+                                .onAppear {
+                                    if index == photos.count - 1 {
+                                        Task { await loadPhotos() }
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 16)
-                        .padding(.bottom, 120)
+                        .padding(.bottom, 20) // 下部パディングを調整
+                        
+                        // ★追加: 追加読み込み中のインジケータ
+                        if isLoading && !photos.isEmpty {
+                            ProgressView()
+                                .padding(.vertical, 20)
+                        }
+                        
+                        Spacer().frame(height: 100)
                     }
                 }
             }
@@ -218,23 +236,42 @@ struct SentListView: View {
             }
         }
         .task {
-            await loadPhotos()
+            // ★変更: まだ読み込んでいなければ読み込む
+            if photos.isEmpty && !isLoading {
+                await loadPhotos()
+            }
         }
     }
 
     // MARK: - Actions
 
     private func loadPhotos() async {
-        guard !isLoading else { return }
+        // ★変更: 読み込み中または読み込み完了済みなら何もしない
+        guard !isLoading && !isFinished else { return }
         isLoading = true
-        defer { isLoading = false }
+        // defer { isLoading = false } // append内でfalseにするため削除
 
         do {
-            let docs = try await PhotoService.shared.fetchMyPhotos()
+            // ★変更: ページネーション付きメソッド呼び出し
+            let result = try await PhotoService.shared.fetchMyPhotos(limit: 20, lastSnapshot: lastSnapshot)
+            
+            // 続きがなければ終了
+            if result.photos.isEmpty {
+                isFinished = true
+                isLoading = false
+                return
+            }
+            
+            self.lastSnapshot = result.lastSnapshot
+            // 取得件数がリクエストより少なければ終了フラグを立てる
+            if result.photos.count < 20 {
+                isFinished = true
+            }
+            
             var items: [SentPhoto] = []
             
             try await withThrowingTaskGroup(of: SentPhoto?.self) { group in
-                for doc in docs {
+                for doc in result.photos {
                     group.addTask {
                         do {
                             let image = try await PhotoService.shared
@@ -259,11 +296,14 @@ struct SentListView: View {
             }
 
             await MainActor.run {
-                self.photos = sortedItems
+                // ★変更: 配列を置き換えるのではなく追加する
+                self.photos.append(contentsOf: sortedItems)
+                self.isLoading = false
             }
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
+                self.isLoading = false
             }
         }
     }
