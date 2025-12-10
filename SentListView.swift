@@ -27,44 +27,45 @@ struct SentThumbnailView: View {
     @State private var appeared = false
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Image(uiImage: photo.image)
-                .resizable()
-                .scaledToFill()
-                // ★修正1: 横幅をグリッド幅いっぱいに固定（これで拡大後も崩れません）
-                .frame(maxWidth: .infinity)
-                .frame(height: 220)
-                .clipped()
-                .cornerRadius(20)
-
-            if photo.document.likeCount > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("\(photo.document.likeCount)")
-                        .font(.system(size: 11, weight: .semibold))
+        // Grid内のサムネイル構造（LikedListViewと統一）
+        Image(uiImage: photo.image)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity)
+            .frame(height: 220)
+            .clipped()
+            .cornerRadius(20)
+            // ハートカウントは overlay で乗せる
+            .overlay(alignment: .bottomTrailing) {
+                if photo.document.likeCount > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("\(photo.document.likeCount)")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.black.opacity(0.55))
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                    .padding(8)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.black.opacity(0.55))
-                .foregroundColor(.white)
-                .cornerRadius(12)
-                .padding(8)
             }
-        }
-        .offset(y: appeared ? 0 : 40)
-        .opacity(appeared ? 1 : 0)
-        .onAppear {
-            withAnimation(
-                .spring(response: 0.55, dampingFraction: 0.85)
-                    .delay(Double(index) * 0.12)
-            ) {
-                appeared = true
+            // アニメーション
+            .offset(y: appeared ? 0 : 40)
+            .opacity(appeared ? 1 : 0)
+            .onAppear {
+                withAnimation(
+                    .spring(response: 0.55, dampingFraction: 0.85)
+                        .delay(Double(index) * 0.12)
+                ) {
+                    appeared = true
+                }
             }
-        }
-        .onTapGesture {
-            onTap()
-        }
+            .onTapGesture {
+                onTap()
+            }
     }
 }
 
@@ -78,10 +79,6 @@ struct SentListView: View {
 
     @State private var selectedPhoto: SentPhoto?
     @State private var cardScale: CGFloat = 0.9
-
-    // アラート管理用
-    @State private var showDeleteAlert = false
-    @State private var showDownloadAlert = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -143,7 +140,7 @@ struct SentListView: View {
                         selectedPhoto = nil
                     }
 
-                // ★修正2: spacingを0にし、スペーシングを統一
+                // カードを画面中央に配置
                 VStack(spacing: 0) {
                     Spacer()
 
@@ -160,94 +157,46 @@ struct SentListView: View {
                         likeCount: item.document.likeCount,
                         showLikeButton: false
                     )
-                    .frame(height: 520) // Home/Likedと同じ高さ
+                    .frame(height: 520)
                     .scaleEffect(cardScale)
-                    .padding(.horizontal, 24) // Home/Likedと同じ余白
+                    .padding(.horizontal, 24)
                     
-                    // ★修正3: テキストなしのアイコンボタンを配置
-                    HStack(spacing: 40) {
-                        
-                        // ダウンロードボタン
-                        Button {
-                            showDownloadAlert = true
-                        } label: {
-                            ZStack {
-                                Circle().fill(Color.white)
-                                Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 22, weight: .semibold)) // アイコンサイズ調整
-                                    .foregroundColor(.black)
-                            }
-                            .frame(width: 56, height: 56)
-                            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
-                        }
+                    // ボタン類を削除したため、カードのみ表示されます
 
-                        // 送信取り消しボタン
-                        Button(role: .destructive) {
-                            showDeleteAlert = true
-                        } label: {
-                            ZStack {
-                                Circle().fill(Color.white)
-                                Image(systemName: "trash")
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundColor(.red) // 警告色
-                            }
-                            .frame(width: 56, height: 56)
-                            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
-                        }
-                    }
-                    .padding(.top, 24) // カードとの間隔
-                    .padding(.bottom, 40)
-                }
-                // アラート類
-                .alert("Save Photo", isPresented: $showDownloadAlert) {
-                    Button("Save") {
-                        saveImageToGallery(image: item.image)
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Do you want to save this photo to your library?")
-                }
-                .alert("Cancel Sending", isPresented: $showDeleteAlert) {
-                    Button("Delete", role: .destructive) {
-                        Task { await cancelSending(item) }
-                    }
-                    Button("Back", role: .cancel) {}
-                } message: {
-                    Text("This photo will be deleted and no longer visible to others. Are you sure?")
-                }
-            }
-
-            // 閉じるボタン（拡大中は非表示）
-            if selectedPhoto == nil {
-                VStack {
                     Spacer()
-                    HStack {
-                        Button {
-                            dismiss()
-                        } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white)
-                                Circle()
-                                    .stroke(Color.black.opacity(0.1), lineWidth: 1)
-
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundColor(.black)
-                            }
-                            .frame(width: 60, height: 60)
-                            .shadow(color: Color.black.opacity(0.1), radius: 0, x: 0, y: 4)
-                        }
-                        .buttonStyle(.plain)
-
-                        Spacer()
-                    }
-                    .padding(.leading, 33)
-                    .padding(.bottom, 40)
                 }
             }
+
+            // 閉じるボタン（右上の×）
+            VStack {
+                Spacer()
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                            Circle()
+                                .stroke(Color.black.opacity(0.1), lineWidth: 1)
+
+                            Image(systemName: "xmark")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.black)
+                        }
+                        .frame(width: 60, height: 60)
+                        .shadow(color: Color.black.opacity(0.1), radius: 0, x: 0, y: 4)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+                }
+                .padding(.leading, 33)
+                .padding(.bottom, 40)
+            }
+            .opacity(selectedPhoto == nil ? 1 : 0)
             
-            // 成功メッセージ
+            // 成功メッセージ（必要であれば残す）
             if let message = successMessage {
                 VStack {
                     Spacer()
@@ -274,17 +223,6 @@ struct SentListView: View {
     }
 
     // MARK: - Actions
-
-    private func saveImageToGallery(image: UIImage) {
-        let saver = ImageSaver()
-        saver.successHandler = {
-            withAnimation { successMessage = "Saved to Photos" }
-        }
-        saver.errorHandler = { err in
-            errorMessage = err.localizedDescription
-        }
-        saver.writeToPhotoAlbum(image: image)
-    }
 
     private func loadPhotos() async {
         guard !isLoading else { return }
@@ -327,43 +265,6 @@ struct SentListView: View {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
             }
-        }
-    }
-
-    private func cancelSending(_ item: SentPhoto) async {
-        do {
-            try await PhotoService.shared.deletePhoto(
-                documentId: item.document.id,
-                imagePath: item.document.imagePath
-            )
-
-            await MainActor.run {
-                photos.removeAll { $0.id == item.id }
-                selectedPhoto = nil
-                successMessage = "Photo deleted"
-            }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = error.localizedDescription
-            }
-        }
-    }
-}
-
-// 画像保存ヘルパークラス
-class ImageSaver: NSObject {
-    var successHandler: (() -> Void)?
-    var errorHandler: ((Error) -> Void)?
-
-    func writeToPhotoAlbum(image: UIImage) {
-        UIImageWriteToSavedPhotosAlbum(image, self, #selector(saveCompleted), nil)
-    }
-
-    @objc func saveCompleted(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
-        if let error = error {
-            errorHandler?(error)
-        } else {
-            successHandler?()
         }
     }
 }
