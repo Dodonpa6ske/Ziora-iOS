@@ -9,7 +9,6 @@ struct SentPhoto: Identifiable, Hashable {
     let document: PhotoDocument
     let image: UIImage
 
-    // id だけで同一判定
     static func == (lhs: SentPhoto, rhs: SentPhoto) -> Bool {
         lhs.id == rhs.id
     }
@@ -19,7 +18,6 @@ struct SentPhoto: Identifiable, Hashable {
     }
 }
 
-// サムネイル 1 枚（下からスライドイン + いいねバッジ）
 struct SentThumbnailView: View {
     let photo: SentPhoto
     let index: Int
@@ -36,7 +34,6 @@ struct SentThumbnailView: View {
                 .clipped()
                 .cornerRadius(20)
 
-            // いいね数バッジ
             if photo.document.likeCount > 0 {
                 HStack(spacing: 4) {
                     Image(systemName: "heart.fill")
@@ -52,12 +49,12 @@ struct SentThumbnailView: View {
                 .padding(8)
             }
         }
-        .offset(y: appeared ? 0 : 40)   // 下からスライド
+        .offset(y: appeared ? 0 : 40)
         .opacity(appeared ? 1 : 0)
         .onAppear {
             withAnimation(
                 .spring(response: 0.55, dampingFraction: 0.85)
-                    .delay(Double(index) * 0.12) // いいねリストと同系の時間差
+                    .delay(Double(index) * 0.12)
             ) {
                 appeared = true
             }
@@ -78,7 +75,6 @@ struct SentListView: View {
     @State private var selectedPhoto: SentPhoto?
     @State private var cardScale: CGFloat = 0.9
 
-    // 2 カラム・サムネイル間隔 8pt
     private let columns = [
         GridItem(.flexible(), spacing: 8),
         GridItem(.flexible(), spacing: 8)
@@ -86,12 +82,10 @@ struct SentListView: View {
 
     var body: some View {
         ZStack {
-            // 全体背景 (#F6F6F6)
             Color.zioraLightBackground
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // 上から少し余白（白背景とのバランス用）
                 Spacer().frame(height: 40)
 
                 if isLoading && photos.isEmpty {
@@ -114,7 +108,6 @@ struct SentListView: View {
                                     photo: item,
                                     index: index
                                 ) {
-                                    // タップで拡大表示
                                     selectedPhoto = item
                                     cardScale = 0.85
                                     withAnimation(
@@ -129,7 +122,7 @@ struct SentListView: View {
                             }
                         }
                         .padding(.horizontal, 16)
-                        .padding(.bottom, 120) // 下のバツボタンぶん余白
+                        .padding(.bottom, 120)
                     }
                 }
             }
@@ -146,22 +139,21 @@ struct SentListView: View {
                     Spacer()
 
                     GachaResultCard(
-                                            image: item.image,
-                                            country: item.document.country,
-                                            region: item.document.region,
-                                            city: item.document.city,
-                                            dateText: item.document.dateText ?? "",
-                                            latitude: item.document.latitude,
-                                            longitude: item.document.longitude,
-                                            photoId: item.document.id,
-                                            imagePath: item.document.imagePath
-                                        )
-                                        .frame(height: 520) // ★ 追加: HomeViewのガチャカードと高さを合わせる
-                                        .scaleEffect(cardScale)
-                                        .padding(.horizontal, 24) // ★ 追加: HomeViewのガチャカードと横幅(余白)を合わせる
-                                        .padding(.bottom, 16)
+                        image: item.image,
+                        country: item.document.country,
+                        region: item.document.region,
+                        city: item.document.city,
+                        dateText: item.document.dateText ?? "",
+                        latitude: item.document.latitude,
+                        longitude: item.document.longitude,
+                        photoId: item.document.id,
+                        imagePath: item.document.imagePath
+                    )
+                    .frame(height: 520)
+                    .scaleEffect(cardScale)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
 
-                    // いいね数 + 送信取り消しボタン
                     HStack {
                         if item.document.likeCount > 0 {
                             HStack(spacing: 4) {
@@ -187,8 +179,7 @@ struct SentListView: View {
                 }
             }
 
-            // 下左のバツボタン（ホームの送信リストボタン位置に合わせる）
-            // 拡大表示中は非表示にしてカードと被らないようにする
+            // 下左のバツボタン（ホーム画面と位置・サイズを統一）
             if selectedPhoto == nil {
                 VStack {
                     Spacer()
@@ -200,21 +191,20 @@ struct SentListView: View {
                                 Circle()
                                     .fill(Color.white)
                                 Circle()
-                                    .stroke(Color.black.opacity(0.08), lineWidth: 2)
+                                    .stroke(Color.black.opacity(0.1), lineWidth: 1)
 
                                 Image(systemName: "xmark")
-                                    .font(.system(size: 22, weight: .bold))
+                                    .font(.system(size: 24, weight: .semibold)) // 24pt
                                     .foregroundColor(.black)
                             }
-                            .frame(width: 72, height: 72)
-                            .shadow(color: Color.black.opacity(0.12),
-                                    radius: 10, x: 0, y: 6)
+                            .frame(width: 60, height: 60) // 60pt
+                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 0)
                         }
                         .buttonStyle(.plain)
 
                         Spacer()
                     }
-                    .padding(.leading, 33)
+                    .padding(.leading, 33) // 左端から33pt (HomeViewと統一)
                     .padding(.bottom, 40)
                 }
             }
@@ -232,56 +222,49 @@ struct SentListView: View {
         }
     }
 
-    // MARK: - Data
-
     private func loadPhotos() async {
-            guard !isLoading else { return }
-            isLoading = true
-            defer { isLoading = false }
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
 
-            do {
-                let docs = try await PhotoService.shared.fetchMyPhotos()
-
-                var items: [SentPhoto] = []
+        do {
+            let docs = try await PhotoService.shared.fetchMyPhotos()
+            var items: [SentPhoto] = []
+            
+            try await withThrowingTaskGroup(of: SentPhoto?.self) { group in
+                for doc in docs {
+                    group.addTask {
+                        do {
+                            let image = try await PhotoService.shared
+                                .downloadThumbnail(originalPath: doc.imagePath)
+                            return SentPhoto(id: doc.id, document: doc, image: image)
+                        } catch {
+                            print("Failed to download thumbnail for \(doc.id): \(error)")
+                            return nil
+                        }
+                    }
+                }
                 
-                // ★ 並列ダウンロードで高速化（TaskGroupを使用）
-                try await withThrowingTaskGroup(of: SentPhoto?.self) { group in
-                    for doc in docs {
-                        group.addTask {
-                            do {
-                                // 🔴 ここを変更: downloadImage → downloadThumbnail
-                                let image = try await PhotoService.shared
-                                    .downloadThumbnail(originalPath: doc.imagePath)
-                                return SentPhoto(id: doc.id, document: doc, image: image)
-                            } catch {
-                                print("Failed to download thumbnail for \(doc.id): \(error)")
-                                return nil
-                            }
-                        }
+                for try await item in group {
+                    if let item = item {
+                        items.append(item)
                     }
-                    
-                    // ダウンロード完了した順に配列に追加
-                    for try await item in group {
-                        if let item = item {
-                            items.append(item)
-                        }
-                    }
-                }
-
-                // 日付順（新しい順）に並べ直してセット
-                let sortedItems = items.sorted {
-                    ($0.document.createdAt?.dateValue() ?? Date()) > ($1.document.createdAt?.dateValue() ?? Date())
-                }
-
-                await MainActor.run {
-                    self.photos = sortedItems
-                }
-            } catch {
-                await MainActor.run {
-                    self.errorMessage = error.localizedDescription
                 }
             }
+
+            let sortedItems = items.sorted {
+                ($0.document.createdAt?.dateValue() ?? Date()) > ($1.document.createdAt?.dateValue() ?? Date())
+            }
+
+            await MainActor.run {
+                self.photos = sortedItems
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+            }
         }
+    }
 
     private func cancelSending(_ item: SentPhoto) async {
         do {

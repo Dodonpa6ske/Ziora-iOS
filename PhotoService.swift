@@ -497,4 +497,35 @@ final class PhotoService {
         }
     }
 
+    // MARK: - Validation
+
+    /// 指定されたIDの写真がFirestore上に存在するか確認し、存在するIDのみを返す
+    /// (送信者によって削除された写真を検知するため)
+    func validateExistence(ids: [String]) async -> [String] {
+        var existingIds: [String] = []
+        
+        // 並行処理で効率的にチェック
+        await withTaskGroup(of: String?.self) { group in
+            for id in ids {
+                group.addTask {
+                    let docRef = self.db.collection("photos").document(id)
+                    do {
+                        // キャッシュではなくサーバーに問い合わせて削除を確認する
+                        let snap = try await docRef.getDocument(source: .server)
+                        return snap.exists ? id : nil
+                    } catch {
+                        // オフラインやエラー時は勝手に消さないように「存在する」扱いとして返す（安全策）
+                        // print("Validation error (offline?): \(error)")
+                        return id
+                    }
+                }
+            }
+            
+            for await id in group {
+                if let id = id { existingIds.append(id) }
+            }
+        }
+        return existingIds
+    }
+
 } // ← クラスの閉じカッコ

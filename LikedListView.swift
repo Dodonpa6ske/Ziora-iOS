@@ -8,52 +8,40 @@ private struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
-// ★ 追加: アニメーション修正済みのサムネイルビュー
-struct LikedThumbnailView: View {
+// 画像とメタデータをセットで保持する構造体
+struct LikedPhotoItem: Identifiable {
+    let id: String
     let photo: LikedPhoto
+    let image: UIImage
+}
+
+// アニメーション修正済みのサムネイルビュー
+struct LikedThumbnailView: View {
+    let item: LikedPhotoItem
     let index: Int
 
-    @State private var image: UIImage? = nil
     @State private var isVisible = false
 
     var body: some View {
-        Group {
-            if let img = image {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                // ロード中はグレーの背景
-                Color.gray.opacity(0.2)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 220)
-        .clipped()
-        .cornerRadius(20)
-        // ★初期状態: 透明 & 40pt下に配置
-        .opacity(isVisible ? 1 : 0)
-        .offset(y: isVisible ? 0 : 40)
-        .onAppear {
-            // 画像ロード（まだ読み込んでいなければ）
-            if image == nil {
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let loaded = LikedPhotoStore.shared.loadLocalImage(for: photo)
-                    DispatchQueue.main.async {
-                        self.image = loaded
-                    }
+        Image(uiImage: item.image)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity)
+            .frame(height: 220)
+            .clipped()
+            .cornerRadius(20)
+            // アニメーション設定
+            .opacity(isVisible ? 1 : 0)
+            .offset(y: isVisible ? 0 : 40)
+            .onAppear {
+                guard !isVisible else { return }
+                withAnimation(
+                    .spring(response: 0.55, dampingFraction: 0.85)
+                        .delay(Double(index) * 0.12)
+                ) {
+                    isVisible = true
                 }
             }
-            
-            // ★ SendListと同じSpringアニメーションと遅延(ラグ)を設定
-            guard !isVisible else { return }
-            withAnimation(
-                .spring(response: 0.55, dampingFraction: 0.85)
-                    .delay(Double(index) * 0.12) // インデックスに応じた遅延
-            ) {
-                isVisible = true
-            }
-        }
     }
 }
 
@@ -61,8 +49,12 @@ struct LikedListView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var likedStore = LikedPhotoStore.shared
 
+    // 事前ロードしたアイテムを保持する配列
+    @State private var items: [LikedPhotoItem] = []
+    @State private var isLoading = true
+
     @State private var selectedPhoto: LikedPhoto? = nil
-    @State private var selectedImage: UIImage? = nil // ★ 追加: 拡大表示用の画像保持
+    @State private var selectedImage: UIImage? = nil
     @State private var cardScale: CGFloat = 0.9
     @State private var scrollOffset: CGFloat = 0
 
@@ -75,17 +67,18 @@ struct LikedListView: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
 
-            // 背景は F6F6F6 だけ
+            // 背景
             Color.zioraLightBackground
                 .ignoresSafeArea()
 
             // サムネイルリスト本体
             VStack(spacing: 0) {
-                // 上の余白（ステータスバー＋少し）
                 Spacer().frame(height: 40)
 
-                if likedStore.photos.isEmpty {
-                    // いいねゼロのとき
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if items.isEmpty {
                     Text("No liked photos yet")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -105,20 +98,16 @@ struct LikedListView: View {
                         LazyVGrid(
                             columns: columns,
                             alignment: .center,
-                            spacing: 8          // ← サムネイル同士の縦間隔も 8
+                            spacing: 8
                         ) {
-                            ForEach(
-                                Array(likedStore.photos.enumerated()),
-                                id: \.element.id
-                            ) { index, photo in
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                                 LikedThumbnailView(
-                                    photo: photo,
+                                    item: item,
                                     index: index
                                 )
                                 .onTapGesture {
-                                    // ★ 修正: タップされたらローカルから画像をロードしてセット
-                                    selectedImage = LikedPhotoStore.shared.loadLocalImage(for: photo)
-                                    selectedPhoto = photo
+                                    selectedImage = item.image
+                                    selectedPhoto = item.photo
                                     
                                     cardScale = 0.85
                                     withAnimation(
@@ -161,43 +150,44 @@ struct LikedListView: View {
                     )
                 }
 
-                // 下の余白
                 Spacer().frame(height: 40)
             }
 
-            // 右下のバツボタン
+            // 右下のバツボタン（ホーム画面と位置・サイズを統一）
             Button {
                 dismiss()
             } label: {
                 ZStack {
                     Circle()
-                        .stroke(Color.black.opacity(0.07), lineWidth: 2)
-                        .background(
-                            Circle().fill(Color.white)
-                        )
+                        .fill(Color.white)
+                    Circle()
+                        .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                    
                     Image(systemName: "xmark")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 24, weight: .semibold)) // 24pt
                         .foregroundColor(.black)
                 }
-                .frame(width: 72, height: 72)
+                .frame(width: 60, height: 60) // 60pt
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 0)
             }
-            .padding(.trailing, 24)
+            .padding(.trailing, 33) // 右端から33pt (HomeViewと統一)
             .padding(.bottom, 40)
 
-            // 拡大カードのオーバーレイ（画面中央）
-            // ★ 修正: photo と image 両方が揃っているときだけ表示
+            // 拡大カードのオーバーレイ
             if let photo = selectedPhoto, let image = selectedImage {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        selectedPhoto = nil
-                        selectedImage = nil // クリア
+                        withAnimation {
+                            selectedPhoto = nil
+                            selectedImage = nil
+                        }
                     }
 
                 VStack {
                     Spacer()
                     GachaResultCard(
-                        image: image, // ★ 修正: ここでロードした画像を渡す (photo.image ではない)
+                        image: image,
                         country: photo.country,
                         region: photo.region,
                         city: photo.city,
@@ -207,13 +197,85 @@ struct LikedListView: View {
                         photoId: photo.id,
                         imagePath: photo.imagePath
                     )
-                    .frame(height: 520) // ★ 追加: HomeViewのガチャカードと高さを合わせる
+                    .frame(height: 520)
                     .scaleEffect(cardScale)
-                    .padding(.horizontal, 24) // ★ 変更: 16 -> 24 (HomeViewに合わせる)
+                    .padding(.horizontal, 24)
                     Spacer()
+                }
+                .transition(.scale(scale: 0.85).combined(with: .opacity))
+            }
+        }
+        // .ignoresSafeArea(edges: .bottom) を削除してセーフエリア準拠にする
+        .task {
+            await loadImages()
+            await validatePhotos()
+        }
+        .onChange(of: likedStore.photos) { newPhotos in
+            syncItems(with: newPhotos)
+        }
+    }
+
+    private func loadImages() async {
+        if items.isEmpty { isLoading = true }
+        defer { isLoading = false }
+        
+        let photos = likedStore.photos
+        var loadedItems: [LikedPhotoItem] = []
+
+        await withTaskGroup(of: LikedPhotoItem?.self) { group in
+            for photo in photos {
+                group.addTask {
+                    if let image = LikedPhotoStore.shared.loadLocalImage(for: photo) {
+                        return LikedPhotoItem(id: photo.id, photo: photo, image: image)
+                    }
+                    return nil
+                }
+            }
+            
+            for await item in group {
+                if let item = item {
+                    loadedItems.append(item)
                 }
             }
         }
-        .ignoresSafeArea(edges: .bottom)
+        
+        let orderMap = Dictionary(uniqueKeysWithValues: photos.enumerated().map { ($0.element.id, $0.offset) })
+        loadedItems.sort { (orderMap[$0.id] ?? 0) < (orderMap[$1.id] ?? 0) }
+
+        await MainActor.run {
+            self.items = loadedItems
+        }
+    }
+
+    private func validatePhotos() async {
+        let currentIds = items.map { $0.id }
+        guard !currentIds.isEmpty else { return }
+        
+        let validIds = await PhotoService.shared.validateExistence(ids: currentIds)
+        let validIdSet = Set(validIds)
+        let deletedIds = currentIds.filter { !validIdSet.contains($0) }
+        
+        if !deletedIds.isEmpty {
+            await MainActor.run {
+                for id in deletedIds {
+                    likedStore.remove(id: id)
+                }
+            }
+        }
+    }
+    
+    private func syncItems(with newPhotos: [LikedPhoto]) {
+        let newIds = Set(newPhotos.map { $0.id })
+        
+        if let selected = selectedPhoto, !newIds.contains(selected.id) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedPhoto = nil
+                selectedImage = nil
+            }
+        }
+        
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            items.removeAll { !newIds.contains($0.id) }
+        }
     }
 }
