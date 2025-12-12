@@ -3,11 +3,18 @@ import FirebaseCore
 import FirebaseMessaging
 import GoogleMobileAds
 import UserNotifications
+// ★追加: App Checkをインポート
+import FirebaseAppCheck
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
     
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        
+        // ★追加: App Check のプロバイダーを設定 (FirebaseApp.configure() の直前)
+        let providerFactory = ZioraAppCheckProviderFactory()
+        AppCheck.setAppCheckProviderFactory(providerFactory)
+        
         FirebaseApp.configure()
         MobileAds.shared.start(completionHandler: nil)
         
@@ -44,6 +51,19 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([[.banner, .sound]])
+    }
+}
+
+// ★追加: App Check のプロバイダーファクトリークラス
+class ZioraAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
+    func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
+        #if targetEnvironment(simulator)
+            // シミュレーターの場合はデバッグプロバイダーを使用
+            return AppCheckDebugProvider(app: app)
+        #else
+            // 実機の場合は本番用の App Attest を使用
+            return AppAttestProvider(app: app)
+        #endif
     }
 }
 
