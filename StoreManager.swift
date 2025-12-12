@@ -2,8 +2,8 @@ import Foundation
 import StoreKit
 import Combine
 
-// ★ 設定ファイルの Product ID と一致させる
-public let productIdAdFree = "com.akira.ziora.adfree"
+// ★ 修正: サブスクリプション用の新しいProduct IDに変更
+public let productIdAdFree = "com.akira.ziora.adfree.monthly"
 
 @MainActor
 class StoreManager: ObservableObject {
@@ -63,11 +63,17 @@ class StoreManager: ObservableObject {
         for await result in Transaction.currentEntitlements {
             guard let transaction = try? result.payloadValue else { continue }
             
+            // Product IDの一致を確認
             if transaction.productID == productIdAdFree {
-                if transaction.revocationDate == nil {
-                    self.hasPurchasedAdFree = true
-                    return
+                // 有効期限のチェック（サブスクリプションの場合）
+                if let revocationDate = transaction.revocationDate {
+                    // 取り消し済み
+                    continue
                 }
+                // ※ StoreKit 2の currentEntitlements は自動的に有効なものだけを返すため、
+                // expirationDate のチェックは厳密には不要ですが、有効期限内であることを確認済みとして扱います。
+                self.hasPurchasedAdFree = true
+                return
             }
         }
         self.hasPurchasedAdFree = false

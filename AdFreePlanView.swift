@@ -46,29 +46,42 @@ struct AdFreePlanView: View {
                 } else {
                     // 購入ボタン
                     if let product = storeManager.products.first(where: { $0.id == productIdAdFree }) {
-                        Button {
-                            Task { try? await storeManager.purchase(product) }
-                        } label: {
-                            HStack {
-                                Text("Remove Ads")
-                                Spacer()
-                                Text(product.displayPrice)
+                        VStack(spacing: 16) {
+                            Button {
+                                Task { try? await storeManager.purchase(product) }
+                            } label: {
+                                HStack {
+                                    Text("Subscribe")
+                                    Spacer()
+                                    Text(product.displayPrice + " / month")
+                                }
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(height: 60)
+                                .background(Color(hex: "6C6BFF"))
+                                .cornerRadius(16)
                             }
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(height: 60)
-                            .background(Color(hex: "6C6BFF"))
-                            .cornerRadius(16)
+                            
+                            // 復元 & コード入力
+                            HStack(spacing: 20) {
+                                Button("Restore Purchases") {
+                                    Task { await storeManager.restorePurchases() }
+                                }
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                                
+                                Divider().frame(height: 12)
+                                
+                                // ★追加: プロモーションコード入力（Apple標準シート）
+                                Button("Redeem Code") {
+                                    SKPaymentQueue.default().presentCodeRedemptionSheet()
+                                }
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                            }
                         }
                         .padding(.horizontal, 24)
-                        
-                        Button("Restore Purchases") {
-                            Task { await storeManager.restorePurchases() }
-                        }
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .padding(.top, 10)
                         
                     } else {
                         ProgressView("Loading products...")

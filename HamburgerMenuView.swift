@@ -1,12 +1,15 @@
 import SwiftUI
+import FirebaseAuth
 
 struct HamburgerMenuView: View {
     @Binding var isPresented: Bool
     @EnvironmentObject var storeManager: StoreManager
+    @EnvironmentObject var authManager: AuthManager
 
-    // メニュー項目に対応するアクション
+    // アクション
     let onOpenAdFreePlan: () -> Void
     let onOpenNotificationSettings: () -> Void
+    let onOpenLanguage: () -> Void
     let onOpenLegal: () -> Void
     let onOpenContact: () -> Void
     let onSignOut: () -> Void
@@ -14,179 +17,214 @@ struct HamburgerMenuView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let safeTop = proxy.safeAreaInsets.top
+            let safeArea = proxy.safeAreaInsets
+            let width = proxy.size.width
+            // メニューの幅を画面幅の85%程度に制限
+            let menuWidth = width * 0.85
             
-            // 閉じるボタンの位置（基準）
-            let closeTopPadding = max(75, safeTop + 35) + 10
-            
-            // ★ 変更: リストの開始位置を大幅に下げて余白（ホワイトスペース）を作る
-            // 旧: max(120, safeTop + 80) -> 新: max(220, safeTop + 180)
-            let listTopPadding  = max(220, safeTop + 180)
-
-            ZStack(alignment: .topLeading) {
-                // 背景パネル（白・角丸・影付き）
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(Color.white)
-                    .shadow(color: Color.black.opacity(0.12), radius: 18, x: 0, y: 8)
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .ignoresSafeArea(edges: .vertical)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        // 上部の余白スペース
-                        Spacer().frame(height: listTopPadding)
-
-                        VStack(alignment: .leading, spacing: 18) {
-                            
-                            // MARK: - Premium Section
-                            MenuRowButton(
-                                title: "Ad-free plan",
-                                subtitle: storeManager.hasPurchasedAdFree ? "Active" : "Remove all ads",
-                                systemIcon: storeManager.hasPurchasedAdFree ? "checkmark.circle.fill" : "sparkles",
-                                iconColor: storeManager.hasPurchasedAdFree ? .green : .orange,
-                                action: {
-                                    isPresented = false
-                                    onOpenAdFreePlan()
-                                }
-                            )
-
-                            Divider()
-
-                            // MARK: - Support Section
-                            Group {
-                                Text("Support & Info")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.leading, 8)
-                                    .padding(.bottom, -8)
-                                
-                                MenuRowButton(
-                                    title: "Contact Us",
-                                    subtitle: "Help & Feedback",
-                                    systemIcon: "envelope.fill",
-                                    action: {
-                                        isPresented = false
-                                        onOpenContact()
-                                    }
-                                )
-
-                                MenuRowButton(
-                                    title: "Terms & Privacy",
-                                    subtitle: "Legal information",
-                                    systemIcon: "doc.text.fill",
-                                    action: {
-                                        isPresented = false
-                                        onOpenLegal()
-                                    }
-                                )
-                                
-                                MenuRowButton(
-                                    title: "Notifications",
-                                    subtitle: "System settings",
-                                    systemIcon: "bell.fill",
-                                    action: {
-                                        isPresented = false
-                                        onOpenNotificationSettings()
-                                    }
-                                )
-                            }
-                            
-                            Divider()
-                            
-                            // MARK: - Account Section
-                            Group {
-                                MenuRowButton(
-                                    title: "Sign Out",
-                                    subtitle: "Log out",
-                                    systemIcon: "rectangle.portrait.and.arrow.right",
-                                    iconColor: .gray,
-                                    action: {
-                                        isPresented = false
-                                        onSignOut()
-                                    }
-                                )
-                                
-                                MenuRowButton(
-                                    title: "Delete Account",
-                                    subtitle: "Permanently delete data",
-                                    systemIcon: "trash.fill",
-                                    iconColor: .red,
-                                    action: {
-                                        isPresented = false
-                                        onDeleteAccount()
-                                    }
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        
-                        Spacer().frame(height: 100)
-                    }
-                }
-
-                // 閉じるボタン（右上の×）
-                Button {
-                    withAnimation(.easeIn(duration: 0.22)) { isPresented = false }
-                } label: {
-                    ZStack {
-                        Rectangle().fill(Color.black).frame(width: 30, height: 2).rotationEffect(.degrees(45))
-                        Rectangle().fill(Color.black).frame(width: 30, height: 2).rotationEffect(.degrees(-45))
-                    }
-                    .frame(width: 44, height: 44)
+            ZStack(alignment: .leading) {
+                
+                // 1. メニュー外のタップ領域 (透明な背景)
+                // これを置くことで、メニューの右側（隙間）をタップした時に閉じられるようにする
+                Color.clear
                     .contentShape(Rectangle())
-                }
-                .padding(.top, closeTopPadding + 25)
-                .padding(.leading, 25)
-                .buttonStyle(.plain)
-            }
-            // 左スワイプで閉じるジェスチャー
-            .gesture(
-                DragGesture().onEnded { value in
-                    if abs(value.translation.width) > abs(value.translation.height), value.translation.width < -60 {
+                    .onTapGesture {
                         withAnimation(.easeIn(duration: 0.22)) { isPresented = false }
                     }
+                
+                // 2. メニュー本体 (左側のパネル)
+                ZStack(alignment: .leading) {
+                    // 背景
+                    Color.white.ignoresSafeArea()
+                    
+                    // コンテンツ
+                    VStack(alignment: .leading, spacing: 0) {
+                        
+                        // --- Header ---
+                        HStack(spacing: 16) {
+                            if let _ = UIImage(named: "icon-1024") {
+                                 Image("icon-1024")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 54, height: 54)
+                                    .cornerRadius(12)
+                                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                            } else {
+                                 Image(systemName: "app.fill")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 54, height: 54)
+                                    .foregroundColor(Color(hex: "6C6BFF"))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Ziora")
+                                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                                    .foregroundColor(.black)
+                                
+                                Text(userStatusText)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.top, safeArea.top + 130)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 30)
+
+                        ScrollView(showsIndicators: false) {
+                            VStack(alignment: .leading, spacing: 24) {
+                                
+                                // --- Premium Card ---
+                                Button(action: {
+                                    isPresented = false
+                                    onOpenAdFreePlan()
+                                }) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(storeManager.hasPurchasedAdFree ? "Premium Plan" : "Go Ad-Free")
+                                                .font(.system(size: 18, weight: .bold))
+                                                .foregroundColor(.white)
+                                            
+                                            Text(storeManager.hasPurchasedAdFree ? "Active" : "Remove ads & support us")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundColor(.white.opacity(0.9))
+                                        }
+                                        Spacer()
+                                        Image(systemName: storeManager.hasPurchasedAdFree ? "checkmark.circle.fill" : "sparkles")
+                                            .font(.system(size: 24))
+                                            .foregroundColor(.white)
+                                    }
+                                    .padding(16)
+                                    .background(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [Color(hex: "6C6BFF"), Color(hex: "8E8DFF")]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .cornerRadius(16)
+                                    .shadow(color: Color(hex: "6C6BFF").opacity(0.3), radius: 8, x: 0, y: 4)
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                                .padding(.horizontal, 24)
+
+                                // --- Settings ---
+                                VStack(spacing: 8) {
+                                    SectionHeader(text: "SETTINGS")
+                                    MenuRowItem(icon: "bell.fill", title: "Notifications", action: onOpenNotificationSettings)
+                                    MenuRowItem(icon: "globe", title: "Language", action: onOpenLanguage)
+                                }
+                                .padding(.horizontal, 24)
+                                
+                                // --- Support ---
+                                VStack(spacing: 8) {
+                                    SectionHeader(text: "SUPPORT")
+                                    MenuRowItem(icon: "envelope.fill", title: "Contact Us", action: onOpenContact)
+                                    MenuRowItem(icon: "doc.text.fill", title: "Terms & Privacy", action: onOpenLegal)
+                                }
+                                .padding(.horizontal, 24)
+                                
+                                // --- Account ---
+                                VStack(spacing: 8) {
+                                    SectionHeader(text: "ACCOUNT")
+                                    MenuRowItem(icon: "rectangle.portrait.and.arrow.right", title: "Sign Out", color: .gray, action: onSignOut)
+                                    MenuRowItem(icon: "trash.fill", title: "Delete Account", color: .red, action: onDeleteAccount)
+                                }
+                                .padding(.horizontal, 24)
+                            }
+                            .padding(.bottom, 40)
+                        }
+                        
+                        Spacer()
+                        
+                        // --- Footer ---
+                        Text("Version 1.0.0")
+                            .font(.caption)
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, safeArea.bottom + 10)
+                    }
                 }
-            )
+                .frame(width: menuWidth)
+                .mask(RoundedCorner(radius: 30, corners: [.topRight, .bottomRight]))
+                .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
+                
+                // 左スワイプで閉じるジェスチャー
+                .gesture(
+                    DragGesture().onEnded { value in
+                        if value.translation.width < -50 {
+                            withAnimation(.easeIn(duration: 0.22)) { isPresented = false }
+                        }
+                    }
+                )
+            }
         }
+    }
+    
+    private var userStatusText: String {
+        if !authManager.isSignedIn { return "Not Signed In" }
+        if Auth.auth().currentUser?.isAnonymous ?? true { return "Guest User" }
+        return "Signed In"
     }
 }
 
-// リストの行デザイン（変更なし）
-struct MenuRowButton: View {
-    let title: String
-    let subtitle: String
-    let systemIcon: String
-    var iconColor: Color? = nil
-    let action: () -> Void
+// MARK: - Components
 
+struct SectionHeader: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .bold))
+            .foregroundColor(.secondary.opacity(0.8))
+            .padding(.leading, 8)
+            .padding(.top, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct MenuRowItem: View {
+    let icon: String
+    let title: String
+    var color: Color = Color(hex: "404040")
+    let action: () -> Void
+    
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.zioraLightBackground)
-                    Image(systemName: systemIcon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(iconColor ?? Color(hex: "6C6BFF"))
+                    Circle()
+                        .fill(Color(.secondarySystemBackground))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(color)
                 }
-                .frame(width: 40, height: 40)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.black)
-                    Text(subtitle)
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundColor(.secondary)
-                }
+                
+                // ★修正: 1行制限と自動縮小を追加して改行を防ぐ
+                Text(title)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.primary)
+                    .lineLimit(1) // 1行に制限
+                    .minimumScaleFactor(0.8) // 幅が足りない場合は80%まで文字を小さくする
+                
                 Spacer()
+                
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(uiColor: .tertiaryLabel))
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
+        return Path(path.cgPath)
     }
 }

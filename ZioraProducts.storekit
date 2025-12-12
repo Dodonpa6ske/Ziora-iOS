@@ -14,21 +14,7 @@
 
   ],
   "products" : [
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : true,
-      "internalID" : "C4BA1621",
-      "localizations" : [
-        {
-          "description" : "Remove all ads and support development.",
-          "displayName" : "Remove Ads",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.akira.ziora.adfree",
-      "referenceName" : "Ad Free Plan",
-      "type" : "NonConsumable"
-    }
+
   ],
   "settings" : {
     "_askToBuyEnabled" : false,
@@ -45,7 +31,49 @@
     "_timeRate" : 0
   },
   "subscriptionGroups" : [
+    {
+      "id" : "21433300",
+      "localizations" : [
+        {
+          "description" : "Unlock premium features",
+          "displayName" : "Ziora Premium",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "Ziora Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
 
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "C4BA1622",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Remove all ads and support development.",
+              "displayName" : "Ad Free Monthly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "広告を非表示にし、開発を支援します。",
+              "displayName" : "広告非表示プラン (月額)",
+              "locale" : "ja"
+            }
+          ],
+          "productID" : "com.akira.ziora.adfree.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Ad Free Monthly",
+          "subscriptionGroupID" : "21433300",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
   ],
   "version" : {
     "major" : 4,

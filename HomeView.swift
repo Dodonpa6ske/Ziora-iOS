@@ -35,6 +35,10 @@ struct HomeView: View {
     @State private var isFlyingAway = false       // 上空へ飛んでいくフラグ
     @State private var showSuccessCheckmark = false // 完了マーク表示
     
+    // ★追加: 新しい画面（シート）の表示フラグ
+    @State private var showLanguageSheet = false
+    @State private var showContactSheet = false
+    
     // Gacha (download) state
     @State private var isGachaLoading = false
     @State private var gachaImage: UIImage? = nil
@@ -94,7 +98,8 @@ struct HomeView: View {
                 // 上部ハンバーガー
                 HStack {
                     Button {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        // ★修正: メニューを開くときは easeOut でスライドインさせる
+                        withAnimation(.easeOut(duration: 0.25)) {
                             showMenu = true
                         }
                         onOpenMenu()
@@ -214,7 +219,7 @@ struct HomeView: View {
                                 }
                             }
                         )
-                        // ★修正: サイズをガチャ画面と統一
+                        // サイズをガチャ画面と統一
                         .frame(height: gachaCardHeight)
                         .padding(.horizontal, 24)
                         
@@ -260,26 +265,37 @@ struct HomeView: View {
             
             // ===== ハンバーガーメニュー =====
             if showMenu {
+                // 背景の黒透過
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
                     .onTapGesture { withAnimation(.easeIn(duration: 0.22)) { showMenu = false } }
-                    .transition(.opacity)
+                    .transition(.opacity) // 背景はフェード
                 
-                HStack {
+                // メニュー本体
+                HStack(spacing: 0) {
                     HamburgerMenuView(
                         isPresented: $showMenu,
                         onOpenAdFreePlan: { showAdFreeSheet = true },
                         onOpenNotificationSettings: { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } },
+                        
+                        // ★追加: 言語設定を開く
+                        onOpenLanguage: { showLanguageSheet = true },
+                        
                         onOpenLegal: { if let url = URL(string: "https://www.notion.so/Ziora-Terms-of-Service-2c0aacfc1c6f801f934cdafe1e0bf063?source=copy_link") { UIApplication.shared.open(url) } },
-                        onOpenContact: { openContactSupport() },
+                        
+                        // ★修正: アプリ内お問い合わせ画面を開く
+                        onOpenContact: { showContactSheet = true },
+                        
                         onSignOut: { showSignOutAlert = true },
                         onDeleteAccount: { showDeleteAccountAlert = true }
                     )
                     .frame(width: 320)
-                    .transition(.move(edge: .leading))
-                    Spacer()
+                    
+                    Spacer() // 右側を空けて左に寄せる
                 }
                 .ignoresSafeArea()
+                // ★修正: HStack全体にスライドインを適用（これで左外から入ってくる）
+                .transition(.move(edge: .leading))
                 .zIndex(2)
             }
         }
@@ -321,6 +337,12 @@ struct HomeView: View {
         .sheet(isPresented: $showSentList) { NavigationStack { SentListView() } }
         .sheet(isPresented: $showAdFreeSheet) { AdFreePlanView() }
         
+        // ★追加: 言語設定シート
+        .sheet(isPresented: $showLanguageSheet) { LanguageSettingsView() }
+        
+        // ★追加: お問い合わせシート
+        .sheet(isPresented: $showContactSheet) { ContactView() }
+        
         .alert("Sign Out", isPresented: $showSignOutAlert) {
             Button("Sign Out", role: .destructive) { try? AuthManager.shared.signOut() }
             Button("Cancel", role: .cancel) {}
@@ -335,6 +357,7 @@ struct HomeView: View {
         .preferredColorScheme(.light)
     }
     
+    // (旧メール起動ヘルパー：不要なら削除可)
     private func openContactSupport() {
         let email = "ziora.app.contact@gmail.com"
         let subject = "Ziora Support"
@@ -345,12 +368,11 @@ struct HomeView: View {
         }
     }
     
-    // ★修正: 飛んでいくアニメーション (easeOutでなめらかに)
+    // 飛んでいくアニメーション (easeOutでなめらかに)
     private func startFlyAwayAnimation() {
         let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.impactOccurred()
         
-        // ★修正ポイント: .easeOut に変更して初速をつける（減速せず飛び去る）
         withAnimation(.easeOut(duration: 0.4)) {
             isFlyingAway = true
         }
