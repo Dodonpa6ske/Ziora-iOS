@@ -98,6 +98,14 @@ final class PhotoService {
             throw ZioraError.offline
         }
         
+        // ★追加: 禁止地域チェック (ユーザー保護とリスク回避のため)
+        // CN:中国, KP:北朝鮮, RU:ロシア, SY:シリア, IR:イラン, CU:キューバ
+        // 地図のズレ(中国)や、法的・経済的リスク(その他)を回避するためにブロックします
+        let blockedCountryCodes = ["CN", "KP", "RU", "SY", "IR", "CU"]
+        if let code = meta.countryCode, blockedCountryCodes.contains(code.uppercased()) {
+            throw ZioraError.serverError("Service is not available in your region (\(code)).")
+        }
+        
         // 1. ユーザー確認
         guard let user = Auth.auth().currentUser else {
             throw ZioraError.notSignedIn

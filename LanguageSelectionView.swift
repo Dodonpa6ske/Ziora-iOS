@@ -10,13 +10,14 @@ struct LanguageOption: Identifiable {
 struct LanguageSelectionView: View {
     @Binding var selectedLanguageCode: String?
     let onNext: () -> Void
-
+    
     private let languages: [LanguageOption] = [
-        .init(code: "en",      label: "English",  flagAssetName: "flag_us"),
-        .init(code: "ja",      label: "日本語",     flagAssetName: "flag_jp"),
-        .init(code: "zh-Hans", label: "简体中文",   flagAssetName: "flag_cn"),
-        .init(code: "ko",      label: "한국어",     flagAssetName: "flag_kr"),
-        .init(code: "ru",      label: "Русский",   flagAssetName: "flag_ru")
+        .init(code: "en",      label: "English",    flagAssetName: "flag_us"),
+        .init(code: "ja",      label: "日本語",       flagAssetName: "flag_jp"),
+        .init(code: "ko",      label: "한국어",       flagAssetName: "flag_kr"),
+        .init(code: "es",      label: "Español",    flagAssetName: "flag_es"),
+        .init(code: "fr",      label: "Français",   flagAssetName: "flag_fr")
+        
     ]
 
     var body: some View {

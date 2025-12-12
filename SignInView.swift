@@ -5,8 +5,8 @@ import Combine
 struct SignInView: View {
     let onSignedIn: () -> Void
 
-    private let termsURL = URL(string: "https://example.com/terms")!
-    private let privacyURL = URL(string: "https://example.com/privacy")!
+    private let termsURL = URL(string: "https://www.notion.so/Ziora-Terms-of-Service-2c0aacfc1c6f801f934cdafe1e0bf063?source=copy_link")!
+    private let privacyURL = URL(string: "https://www.notion.so/Ziora-Privacy-Policy-2c0aacfc1c6f805e99a5e847005b669e?source=copy_link")!
 
     @State private var isLoading = false
     @State private var errorMessage: String?

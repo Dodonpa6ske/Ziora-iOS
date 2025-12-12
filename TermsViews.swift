@@ -2,14 +2,33 @@ import SwiftUI
 
 // MARK: - ③ 利用規約同意画面
 
-import SwiftUI
-
 struct TermsAgreementView: View {
     let onAgree: () -> Void
     let onDisagree: () -> Void
 
     private let termsURL = URL(string: "https://www.notion.so/Ziora-Terms-of-Service-2c0aacfc1c6f801f934cdafe1e0bf063?source=copy_link")!
     private let privacyURL = URL(string: "https://www.notion.so/Ziora-Privacy-Policy-2c0aacfc1c6f805e99a5e847005b669e?source=copy_link")!
+
+    // ★修正: AttributedString を使ってリンク付きテキストを作成
+    private var agreementText: AttributedString {
+        var text = AttributedString("By continuing, you agree to the Ziora Terms of Service and Privacy Policy")
+        
+        // "Terms of Service" にリンクを設定
+        if let range = text.range(of: "Terms of Service") {
+            text[range].link = termsURL
+            text[range].foregroundColor = .blue
+            text[range].underlineStyle = .single
+        }
+        
+        // "Privacy Policy" にリンクを設定
+        if let range = text.range(of: "Privacy Policy") {
+            text[range].link = privacyURL
+            text[range].foregroundColor = .blue
+            text[range].underlineStyle = .single
+        }
+        
+        return text
+    }
 
     var body: some View {
         ZStack {
@@ -27,23 +46,10 @@ struct TermsAgreementView: View {
                     .frame(height: OnboardingLayout.titleBodySpacing)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("By continuing, you agree to the Ziora ")
+                    // ★修正: AttributedString を表示
+                    Text(agreementText)
                         .font(ZioraFont.body(16))
                         .foregroundColor(.primary)
-                    +
-                    Text("Terms of Service")
-                        .font(ZioraFont.body(16))
-                        .underline()
-                        .foregroundColor(.blue)
-                    +
-                    Text(" and ")
-                        .font(ZioraFont.body(16))
-                        .foregroundColor(.primary)
-                    +
-                    Text("Privacy Policy")
-                        .font(ZioraFont.body(16))
-                        .underline()
-                        .foregroundColor(.blue)
                 }
                 .lineSpacing(16 * 0.1)
 

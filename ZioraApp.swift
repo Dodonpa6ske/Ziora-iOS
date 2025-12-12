@@ -57,11 +57,12 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 // ★追加: App Check のプロバイダーファクトリークラス
 class ZioraAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
     func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
-        #if targetEnvironment(simulator)
-            // シミュレーターの場合はデバッグプロバイダーを使用
+        // ★修正: シミュレーター判定ではなく、デバッグビルド判定に変更
+        // これにより、実機での開発中もデバッグトークンが出力されるようになります
+        #if DEBUG
             return AppCheckDebugProvider(app: app)
         #else
-            // 実機の場合は本番用の App Attest を使用
+            // 本番ビルド(App Store / TestFlight)の場合は App Attest を使用
             return AppAttestProvider(app: app)
         #endif
     }
@@ -102,7 +103,7 @@ struct ZioraApp: App {
     private func scheduleDailyNotification() {
         let content = UNMutableNotificationContent()
         content.title = "Ziora"
-        content.body = "It's been 24 hours! Time to travel the world again. 🌍"
+        content.body = " 🌍 Let's spin the Earth and explore the world!"
         content.sound = .default
 
         // 24時間後 (86400秒)
