@@ -29,7 +29,11 @@ struct HomeView: View {
     @State private var showPreviewCard = false
     @State private var isUploading = false
     @State private var uploadErrorMessage: String? = nil
-    @State private var previewOffset: CGFloat = 0
+    
+    // ★アニメーション制御用
+    @State private var previewOffset: CGFloat = 0 // ドラッグ中のオフセット
+    @State private var isFlyingAway = false       // 上空へ飛んでいくフラグ
+    @State private var showSuccessCheckmark = false // 完了マーク表示
     
     // Gacha (download) state
     @State private var isGachaLoading = false
@@ -65,8 +69,6 @@ struct HomeView: View {
     @State private var showAdThisTime = false
     
     @StateObject private var interactionState = InteractionState()
-    
-    // ★追加: ネットワーク監視
     @StateObject private var networkMonitor = NetworkMonitor.shared
     
     private let gachaCardHeight: CGFloat = 520
@@ -87,12 +89,11 @@ struct HomeView: View {
             .padding(.top, 40)
             .padding(.bottom, 140)
             
-            // UIレイヤー
+            // UIレイヤー (ボタン類)
             VStack(spacing: 0) {
                 // 上部ハンバーガー
                 HStack {
                     Button {
-                        // メニュー表示アニメーション
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             showMenu = true
                         }
@@ -104,13 +105,15 @@ struct HomeView: View {
                     Spacer()
                 }
                 .padding(.top, 50)
+                .opacity(showPreviewCard ? 0 : 1) // プレビュー中は隠す
                 
                 Spacer()
                 
                 // 下部3ボタン
                 HStack {
                     CircleIconButton(
-                        systemName: "paperplane.fill", size: 60,
+                        systemName: "photo.fill",
+                        size: 60,
                         foreground: Color(hex: "908FF7"), background: .white, showShadow: false
                     ) {
                         showSentList = true
@@ -132,6 +135,7 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 33)
                 .padding(.bottom, 40)
+                .opacity(showPreviewCard ? 0 : 1) // プレビュー中は隠す
             }
             
             // ガチャカード
@@ -142,36 +146,32 @@ struct HomeView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { gachaImage = nil }
                     }
                 
-                // 中央配置
                 VStack {
-                    Spacer() // 上の余白
-                    
+                    Spacer()
                     Group {
                         if showAdThisTime {
                             GachaCardShell { NativeAdCardView(adUnitID: testNativeAdUnitID) }
                         } else if let image = gachaImage {
-                                                    GachaResultCard(
-                                                        image: image,
-                                                        country: gachaCountry,
-                                                        region: gachaRegion,
-                                                        city: gachaCity,
-                                                        dateText: gachaDateText,
-                                                        latitude: gachaLatitude,
-                                                        longitude: gachaLongitude,
-                                                        photoId: gachaPhotoId,
-                                                        imagePath: gachaImagePath,
-                                                        likeCount: 0,
-                                                        showLikeButton: true
-                                                    )
-                                                }
+                            GachaResultCard(
+                                image: image,
+                                country: gachaCountry,
+                                region: gachaRegion,
+                                city: gachaCity,
+                                dateText: gachaDateText,
+                                latitude: gachaLatitude,
+                                longitude: gachaLongitude,
+                                photoId: gachaPhotoId,
+                                imagePath: gachaImagePath,
+                                likeCount: 0,
+                                showLikeButton: true
+                            )
+                        }
                     }
                     .frame(height: gachaCardHeight)
                     .padding(.horizontal, 24)
-                    
-                    Spacer() // 下の余白
+                    Spacer()
                 }
                 .offset(y: -40)
-                // 0%から飛び出すポップアップトランジション（設定は維持）
                 .transition(.asymmetric(
                     insertion: .modifier(
                         active: PopUpModifier(scale: 0.0, opacity: 0),
@@ -179,23 +179,32 @@ struct HomeView: View {
                     ),
                     removal: .scale(scale: 0.8).combined(with: .opacity)
                 ))
-                // ★修正: 速度(response)を0.3に速め、バネ(dampingFraction)を0.7に抑える
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showGachaCard)
             }
             
-            // 撮影プレビュー
+            // 撮影プレビューカード (送信UI)
             if showPreviewCard, let image = capturedImage {
                 Color.black.opacity(0.3).ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation { showPreviewCard = false; capturedImage = nil; previewOffset = 0 }
+                        // キャンセル時
+                        withAnimation { showPreviewCard = false; capturedImage = nil; previewOffset = 0; isFlyingAway = false }
                     }
+                    .opacity(isFlyingAway ? 0 : 1) // 飛んでいくときは背景を明るく戻す
+
                 VStack {
                     Spacer()
+                    
                     VStack(spacing: 12) {
                         SwipeUpHint()
+                            .opacity(isFlyingAway ? 0 : 1)
+                        
                         PreviewPhotoCard(
-                            image: image, country: capturedCountry, region: capturedRegion, city: capturedCity,
-                            dateText: capturedDateText, isUploading: isUploading,
+                            image: image,
+                            country: capturedCountry,
+                            region: capturedRegion,
+                            city: capturedCity,
+                            dateText: capturedDateText,
+                            isUploading: isUploading,
                             onDeleteLayer: { key in
                                 switch key {
                                 case "country": capturedCountry = ""
@@ -205,98 +214,88 @@ struct HomeView: View {
                                 }
                             }
                         )
+                        // ★修正: サイズをガチャ画面と統一
+                        .frame(height: gachaCardHeight)
+                        .padding(.horizontal, 24)
+                        
+                        // アニメーション (まっすぐ上へ)
+                        .offset(y: isFlyingAway ? -UIScreen.main.bounds.height * 1.5 : previewOffset)
+                        .scaleEffect(isFlyingAway ? 0.9 : 1.0)
                     }
-                    .offset(y: previewOffset)
                     .gesture(
                         DragGesture()
-                            .onChanged { value in if value.translation.height < 0 { previewOffset = value.translation.height } }
+                            .onChanged { value in
+                                if value.translation.height < 0 {
+                                    previewOffset = value.translation.height
+                                }
+                            }
                             .onEnded { value in
-                                if value.translation.height < -100 { Task { await uploadCurrentPhoto() } }
-                                else { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { previewOffset = 0 } }
+                                // 上にスワイプしたら飛んでいく
+                                if value.translation.height < -100 {
+                                    startFlyAwayAnimation()
+                                } else {
+                                    // 戻る
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        previewOffset = 0
+                                    }
+                                }
                             }
                     )
+                    
+                    Spacer()
                 }
+                // 3Dスライドイン
+                .transition(.modifier(
+                    active: ThreeDSlideModifier(angle: 45, yOffset: 600, opacity: 0),
+                    identity: ThreeDSlideModifier(angle: 0, yOffset: 0, opacity: 1)
+                ))
+            }
+            
+            // 完了チェックマーク
+            if showSuccessCheckmark {
+                SuccessCheckmarkView()
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(100)
             }
             
             // ===== ハンバーガーメニュー =====
             if showMenu {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.easeIn(duration: 0.22)) { showMenu = false }
-                    }
+                    .onTapGesture { withAnimation(.easeIn(duration: 0.22)) { showMenu = false } }
                     .transition(.opacity)
                 
                 HStack {
                     HamburgerMenuView(
                         isPresented: $showMenu,
                         onOpenAdFreePlan: { showAdFreeSheet = true },
-                        onOpenNotificationSettings: {
-                            if let url = URL(string: UIApplication.openSettingsURLString) {
-                                UIApplication.shared.open(url)
-                            }
-                        },
-                        onOpenLegal: {
-                            if let url = URL(string: "https://www.notion.so/Ziora-Terms-of-Service-2c0aacfc1c6f801f934cdafe1e0bf063?source=copy_link") {
-                                UIApplication.shared.open(url)
-                            }
-                        },
-                        onOpenContact: {
-                            openContactSupport()
-                        },
-                        onSignOut: {
-                            showSignOutAlert = true
-                        },
-                        onDeleteAccount: {
-                            showDeleteAccountAlert = true
-                        }
+                        onOpenNotificationSettings: { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } },
+                        onOpenLegal: { if let url = URL(string: "https://www.notion.so/Ziora-Terms-of-Service-2c0aacfc1c6f801f934cdafe1e0bf063?source=copy_link") { UIApplication.shared.open(url) } },
+                        onOpenContact: { openContactSupport() },
+                        onSignOut: { showSignOutAlert = true },
+                        onDeleteAccount: { showDeleteAccountAlert = true }
                     )
                     .frame(width: 320)
                     .transition(.move(edge: .leading))
-                    
                     Spacer()
                 }
                 .ignoresSafeArea()
                 .zIndex(2)
             }
         }
-
-                .onReceive(locationManager.$lastPlacemark) { placemark in
-                    guard let p = placemark else { return }
-                    
-                    // 1. Country (国)
-                    let isoCode = p.isoCountryCode ?? ""
-                    capturedCountry = p.country ?? (isoCode.isEmpty ? "Country" : isoCode)
-                    
-                    // 2. Region (都道府県 / 州)
-                    // administrativeArea が基本。なければ空。
-                    let adminArea = p.administrativeArea ?? ""
-                    capturedRegion = adminArea.isEmpty ? "State" : adminArea
-                    
-                    // 3. City (市区町村)
-                    // ここが重要。locality (市) と subLocality (区) を組み合わせて詳細化する
-                    let locality = p.locality ?? ""       // 例: Osaka
-                    let subLocality = p.subLocality ?? "" // 例: Kita Ward
-                    
-                    if !subLocality.isEmpty {
-                        // 区がある場合 (政令指定都市など)
-                        // localityとsubLocalityが同じ名前の場合の重複排除も考慮
-                        if locality.isEmpty || locality == subLocality {
-                            capturedCity = subLocality
-                        } else {
-                            // "Kita Ward" だけだと弱いが、メタデータとしては "Kita Ward" を保存し
-                            // 表示や検索時に "Kita Ward, Osaka" と組み合わせるのが定石。
-                            // ここではシンプルに最も詳細な地名を採用する
-                            capturedCity = subLocality
-                        }
-                    } else {
-                        // 区がない場合は市を使う
-                        capturedCity = locality.isEmpty ? "City" : locality
-                    }
-                    
-                    // デバッグ出力
-                    print("📍 Location Update: \(capturedCity), \(capturedRegion), \(capturedCountry)")
-                }
+        .onReceive(locationManager.$lastPlacemark) { placemark in
+            guard let p = placemark else { return }
+            let isoCode = p.isoCountryCode ?? ""
+            capturedCountry = p.country ?? (isoCode.isEmpty ? "Country" : isoCode)
+            let adminArea = p.administrativeArea ?? ""
+            capturedRegion = adminArea.isEmpty ? "State" : adminArea
+            let locality = p.locality ?? ""
+            let subLocality = p.subLocality ?? ""
+            if !subLocality.isEmpty {
+                if locality.isEmpty || locality == subLocality { capturedCity = subLocality }
+                else { capturedCity = subLocality }
+            } else { capturedCity = locality.isEmpty ? "City" : locality }
+        }
         .fullScreenCover(isPresented: $showCamera) {
             ZStack {
                 Color.black.ignoresSafeArea()
@@ -306,8 +305,14 @@ struct HomeView: View {
                         if capturedImage != nil {
                             capturedDateText = DateFormatter.zioraDisplay.string(from: Date())
                             locationManager.requestLocation()
-                            let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
-                            previewOffset = 0; withAnimation { showPreviewCard = true }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
+                                previewOffset = 0
+                                isFlyingAway = false
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                                    showPreviewCard = true
+                                }
+                            }
                         }
                     }
             }
@@ -330,7 +335,6 @@ struct HomeView: View {
         .preferredColorScheme(.light)
     }
     
-    // メール起動ヘルパー
     private func openContactSupport() {
         let email = "ziora.app.contact@gmail.com"
         let subject = "Ziora Support"
@@ -341,28 +345,70 @@ struct HomeView: View {
         }
     }
     
+    // ★修正: 飛んでいくアニメーション (easeOutでなめらかに)
+    private func startFlyAwayAnimation() {
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        generator.impactOccurred()
+        
+        // ★修正ポイント: .easeOut に変更して初速をつける（減速せず飛び去る）
+        withAnimation(.easeOut(duration: 0.4)) {
+            isFlyingAway = true
+        }
+        
+        Task {
+            await uploadCurrentPhoto()
+        }
+    }
+    
     private func uploadCurrentPhoto() async {
-        // ★追加: ネットワークチェック (PhotoService側でもチェックしていますが、UX向上のためここでも弾きます)
         guard networkMonitor.isConnected else {
+            withAnimation { isFlyingAway = false; previewOffset = 0 }
             uploadErrorMessage = "No internet connection."
             return
         }
 
         guard !isUploading, let image = capturedImage else { return }
         isUploading = true
+        
         let loc = locationManager.lastLocation
         let placemark = locationManager.lastPlacemark
         let meta = PhotoMeta(country: capturedCountry, region: capturedRegion, city: capturedCity, countryCode: placemark?.isoCountryCode ?? "", latitude: loc?.coordinate.latitude, longitude: loc?.coordinate.longitude, dateText: capturedDateText)
+        
         do {
             _ = try await PhotoService.shared.uploadPhoto(image: image, meta: meta)
-            withAnimation { showPreviewCard = false; capturedImage = nil; previewOffset = 0 }
-            let generator = UINotificationFeedbackGenerator(); generator.notificationOccurred(.success)
-        } catch { uploadErrorMessage = error.localizedDescription }
-        isUploading = false
+            
+            withAnimation { showPreviewCard = false }
+            
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            
+            await MainActor.run {
+                withAnimation(.spring()) { showSuccessCheckmark = true }
+                let notification = UINotificationFeedbackGenerator()
+                notification.notificationOccurred(.success)
+            }
+            
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            await MainActor.run {
+                withAnimation { showSuccessCheckmark = false }
+                capturedImage = nil
+                previewOffset = 0
+                isFlyingAway = false
+                isUploading = false
+            }
+            
+        } catch {
+            await MainActor.run {
+                withAnimation(.spring()) {
+                    isFlyingAway = false
+                    previewOffset = 0
+                }
+                uploadErrorMessage = error.localizedDescription
+                isUploading = false
+            }
+        }
     }
     
     private func performGacha(expectedSpinDuration: TimeInterval, retryCount: Int = 0) async {
-        // ★追加: ネットワークチェック
         guard networkMonitor.isConnected else {
             gachaErrorMessage = "No internet connection."
             return
@@ -387,7 +433,6 @@ struct HomeView: View {
             let delay = max(0, expectedSpinDuration - 0.15)
             if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
             DispatchQueue.main.async {
-                // ★修正: こちらも合わせて調整 (response: 0.3, dampingFraction: 0.7)
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { showGachaCard = true }
                 let generator = UIImpactFeedbackGenerator(style: .medium); generator.impactOccurred()
             }
@@ -413,7 +458,6 @@ struct HomeView: View {
             
             DispatchQueue.main.async {
                 gachaCountry = doc.country; gachaRegion = doc.region; gachaCity = doc.city; gachaDateText = dateString; gachaImage = image
-                // ★修正: こちらも合わせて調整 (response: 0.3, dampingFraction: 0.7)
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { showGachaCard = true }
                 let generator = UIImpactFeedbackGenerator(style: .medium); generator.impactOccurred()
             }
@@ -426,7 +470,6 @@ struct HomeView: View {
             let isNotExistMsg = error.localizedDescription.contains("does not exist")
             
             if isNotFound || isNotExistMsg {
-                print("⚠️ ゾンビデータ検出: \(gachaPhotoId)。削除してリトライします。")
                 try? await PhotoService.shared.deletePhoto(documentId: gachaPhotoId, imagePath: gachaImagePath)
                 isGachaLoading = false
                 await performGacha(expectedSpinDuration: 0.5, retryCount: retryCount + 1)
@@ -447,5 +490,64 @@ struct PopUpModifier: ViewModifier {
         content
             .scaleEffect(scale)
             .opacity(opacity)
+    }
+}
+
+struct ThreeDSlideModifier: ViewModifier {
+    let angle: Double
+    let yOffset: CGFloat
+    let opacity: Double
+    
+    func body(content: Content) -> some View {
+        content
+            .rotation3DEffect(.degrees(angle), axis: (x: 1, y: 0, z: 0))
+            .offset(y: yOffset)
+            .opacity(opacity)
+    }
+}
+
+struct SuccessCheckmarkView: View {
+    @State private var trimEnd: CGFloat = 0.0
+    @State private var textOpacity: Double = 0.0
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 100, height: 100)
+                    .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
+                
+                CheckmarkShape()
+                    .trim(from: 0, to: trimEnd)
+                    .stroke(style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round))
+                    .foregroundColor(Color(hex: "6C6BFF"))
+                    .frame(width: 44, height: 44)
+            }
+            
+            Text("Sent!")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                .opacity(textOpacity)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                trimEnd = 1.0
+            }
+            withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+                textOpacity = 1.0
+            }
+        }
+    }
+}
+
+struct CheckmarkShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.1, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.4, y: rect.maxY - rect.height * 0.1))
+        path.addLine(to: CGPoint(x: rect.maxX - rect.width * 0.1, y: rect.minY + rect.height * 0.1))
+        return path
     }
 }

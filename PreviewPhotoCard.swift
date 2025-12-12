@@ -15,129 +15,118 @@ struct PreviewPhotoCard: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 28)
+            // 背景
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.white)
-                .frame(width: 350, height: 520)
-                .shadow(radius: 16)
+                .shadow(color: Color.black.opacity(0.18),
+                        radius: 18, x: 0, y: 10)
 
-            VStack(spacing: 10) {
-                // 画像
+            VStack(spacing: 0) {
+                // 1. 画像エリア
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 330, height: 410)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                     .cornerRadius(20)
                     .padding(.top, 10)
                     .padding(.horizontal, 10)
 
-                // 位置情報 + 日付
-                VStack(alignment: .leading, spacing: 8) {
+                // 2. 下部情報エリア (左揃え)
+                VStack(alignment: .leading, spacing: 12) {
+                    
+                    // 上段: 位置情報タグ (アイコン + スクロール)
                     HStack(spacing: 8) {
-                        if !country.isEmpty {
-                            DraggablePill(text: country, key: "country")
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundColor(Color(hex: "6C6BFF"))
+                            .font(.system(size: 16))
+                            .frame(width: 20) // アイコン幅を固定して縦列を揃える
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                if !city.isEmpty {
+                                    LocationTagPill(text: city, key: "city", onDelete: onDeleteLayer)
+                                }
+                                if !region.isEmpty {
+                                    LocationTagPill(text: region, key: "region", onDelete: onDeleteLayer)
+                                }
+                                if !country.isEmpty {
+                                    LocationTagPill(text: country, key: "country", onDelete: onDeleteLayer)
+                                }
+                            }
                         }
-                        if !region.isEmpty {
-                            DraggablePill(text: region, key: "region")
-                        }
-                        if !city.isEmpty {
-                            DraggablePill(text: city, key: "city")
-                        }
-                        Spacer()
+                        // フェードマスク処理
+                        .mask(
+                            HStack(spacing: 0) {
+                                Rectangle().fill(Color.black)
+                                LinearGradient(gradient: Gradient(colors: [.black, .clear]), startPoint: .leading, endPoint: .trailing).frame(width: 16)
+                            }
+                        )
                     }
-
-                    Text(dateText)
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
+                    
+                    // 下段: 撮影日時 (左揃え)
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .foregroundColor(.secondary) // グレー
+                            .font(.system(size: 14))
+                            .frame(width: 20) // 上のピンアイコンと幅を合わせる
+                        
+                        Text(dateText)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.secondary)
+                        
+                        Spacer() // 右側を空けて左詰めにする
+                    }
                 }
-                .padding(.top, 10)         // 写真との間隔 10pt
-                .padding(.bottom, 10)
-                .padding(.leading, 12)     // ← カード左端から 12pt
-                .padding(.trailing, 18)
-
-                Spacer(minLength: 0)
+                .padding(.top, 16)
+                .padding(.horizontal, 20) // 全体の横余白
+                .padding(.bottom, 24)     // 下部の余白
             }
-            .frame(width: 350, height: 520, alignment: .top)
-
-            // ゴミ箱（カードの内側、下端から 30pt 上）
-            VStack {
-                Spacer()
-                TrashDropZone { key in
-                    onDeleteLayer(key)
-                }
-                .padding(.bottom, 30)
-            }
-            .frame(width: 350, height: 520)
-
+            
+            // アップロード中の表示
             if isUploading {
-                ProgressView()
-                    .scaleEffect(1.4)
-                    .tint(Color(hex: "6C6BFF"))
+                ZStack {
+                    Color.white.opacity(0.6)
+                        .cornerRadius(28)
+                    ProgressView()
+                        .scaleEffect(1.4)
+                        .tint(Color(hex: "6C6BFF"))
+                }
             }
         }
+        // 横幅は親ビューで制限することを想定
+        .frame(height: 520)
     }
 }
 
-// MARK: - Draggable pill
+// MARK: - Location Tag Pill (Menu対応版)
 
-struct DraggablePill: View {
+struct LocationTagPill: View {
     let text: String
     let key: String
+    let onDelete: (String) -> Void
 
     var body: some View {
         Text(text)
-            .font(.system(size: 20, weight: .semibold))
-            .padding(.horizontal, 12)
+            .font(.system(size: 15, weight: .semibold))
+            .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-            .onDrag {
-                NSItemProvider(object: key as NSString)
-            }
-    }
-}
-
-// MARK: - Trash drop zone
-
-struct TrashDropZone: View {
-    let onDelete: (String) -> Void
-    @State private var isTargeted = false
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color(.systemGray6))
-                .frame(width: 52, height: 52)
-                .shadow(radius: 4)
-
-            Image(systemName: "trash.fill")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(.red)
-        }
-        .scaleEffect(isTargeted ? 1.1 : 1.0)
-        .opacity(isTargeted ? 1.0 : 0.9)
-        .onDrop(of: [UTType.plainText], isTargeted: $isTargeted) { providers in
-            guard let provider = providers.first else { return false }
-
-            provider.loadItem(forTypeIdentifier: UTType.plainText.identifier,
-                              options: nil) { item, _ in
-                var key: String?
-
-                if let data = item as? Data {
-                    key = String(data: data, encoding: .utf8)
-                } else if let str = item as? String {
-                    key = str
-                } else if let ns = item as? NSString {
-                    key = ns as String
-                }
-
-                if let key = key {
-                    DispatchQueue.main.async {
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(10)
+            .contextMenu {
+                Button(role: .destructive) {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.warning)
+                    withAnimation {
                         onDelete(key)
                     }
+                } label: {
+                    Label("Remove Location", systemImage: "trash")
                 }
             }
-            return true
-        }
+            .onTapGesture {
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+            }
     }
 }
