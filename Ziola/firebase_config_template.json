@@ -1,0 +1,17 @@
+{
+    "hosting": {
+        "public": "public",
+        "ignore": [
+            "firebase.json",
+            "**/.*",
+            "**/node_modules/**"
+        ],
+        "redirects": [
+            {
+                "source": "/",
+                "destination": "https://www.notion.so/2d0aacfc1c6f806db5a4ce4e55891c80?source=copy_link",
+                "type": 301
+            }
+        ]
+    }
+}

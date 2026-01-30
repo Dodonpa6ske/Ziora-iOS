@@ -1,0 +1,7 @@
+/* Permission Descriptions */
+"NSCameraUsageDescription" = "Ziora uses the camera to capture and share photos with the world.";
+"NSPhotoLibraryUsageDescription" = "Ziora saves your captured photos to your library.";
+"NSLocationWhenInUseUsageDescription" = "Ziora uses your location to tag your photos with their origin.";
+
+/* App Name (Optional) */
+"CFBundleDisplayName" = "Ziora";

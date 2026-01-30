@@ -1,0 +1,160 @@
+/* 
+  Localizable.strings
+  Ziola
+*/
+
+"Onboarding_Welcome_Title" = "Welcome";
+"Onboarding_Welcome_Desc" = "Ziora is a place to connect with the world through photos.\nBoth the photos you receive and where yours go are completely random.\nEnjoy the unpredictable encounters of 'pure chance'.";
+
+"Onboarding_Share_Title" = "Share";
+"Onboarding_Share_Desc" = "Share the view right in front of you, completely anonymously.\nNo need to worry about followers, likes, or aesthetics.\nYour casual daily life becomes a breathtaking view for someone else.";
+
+"Onboarding_Discover_Title" = "Discover";
+"Onboarding_Discover_Desc" = "What arrives is the real daily life of someone unknown.\nAn unadorned, authentic world.\nThere, you can feel a faint connection with the world.";
+
+"Onboarding_Ready_Title" = "Ready";
+"Onboarding_Ready_Desc" = "The world is much wider than you imagine, filled with unseen encounters.\nNo passport or packing required.\nAll you need is a little curiosity.\nSpin the globe and meet the world.";
+
+"Start_Journey" = "Start Journey";
+"Hold" = "Hold...";
+"Hold_to_Start" = "Hold...";
+"Ready" = "Ready!";
+"Lets_Go" = "Let's Go!";
+
+/* Tutorial */
+"Skip" = "Skip";
+"Tap to Spin the Globe" = "Tap to Spin the Globe";
+"Your first photo awaits!" = "Your first photo awaits!";
+"Swipe up" = "Swipe up";
+
+/* Tutorial Location */
+"Tutorial_Country" = "Japan";
+"Tutorial_Region" = "Tokyo";
+"Tutorial_City" = "Minato City";
+"Tutorial_SubLocality" = "Shibakoen";
+"Spin the Globe" = "Spin the Globe";
+"Search for unseen landscapes." = "Search for unseen landscapes.";
+"Your Turn to Share!" = "Your Turn to Share!";
+"Capture your view and share it\nwith someone across the world." = "Capture your view and share it\nwith someone across the world.";
+
+/* Terms */
+"Accept\nTerms" = "Accept\nTerms";
+"By continuing, you agree to the [Ziora Terms of Service](%@) and [Privacy Policy](%@)" = "By continuing, you agree to the [Ziora Terms of Service](%@) and [Privacy Policy](%@)";
+"Agree and Continue" = "Agree and Continue";
+"Disagree" = "Disagree";
+"Agreement\nRequired" = "Agreement\nRequired";
+"To use Ziora, you need to agree to the Terms of Service and Privacy Policy.\nThese policies explain how we protect your data and ensure a safe experience for all users." = "To use Ziora, you need to agree to the Terms of Service and Privacy Policy.\nThese policies explain how we protect your data and ensure a safe experience for all users.";
+"Back to Agreement" = "Back to Agreement";
+"Close" = "Close";
+
+/* Sign In */
+"Sign\nIn" = "Sign\nIn";
+"Sign in with Google" = "Sign in with Google";
+"Sign in with Apple" = "Sign in with Apple";
+"Continue as Guest" = "Continue as Guest";
+"By signing in, you agree to our" = "By signing in, you agree to our";
+"Terms of Service" = "Terms of Service";
+"and" = "and";
+"Privacy Policy" = "Privacy Policy";
+
+/* Guest Mode */
+"Start in Guest Mode" = "Start in Guest Mode";
+"If you delete the app, your data will be erased, but you can later link an account to carry your data over." = "If you delete the app, your data will be erased, but you can later link an account to carry your data over.";
+"Continue" = "Continue";
+"Back" = "Back";
+
+/* Notification */
+"NotificationTitle" = "Ziora";
+"NotificationBody" = "🌍 Let's spin the Earth and explore the world!";
+"RetentionTitle" = "New Photo Posted";
+"RetentionBody" = "🌍 A new photo has been posted in %@!";
+
+/* Menu */
+"Guest User" = "Guest User";
+"User" = "User";
+"Premium Member" = "Premium Member";
+"Free Plan" = "Free Plan";
+"Premium Plan" = "Premium Plan";
+"Go Ad-Free" = "Go Ad-Free";
+"Active" = "Active";
+"Remove ads" = "Remove ads";
+"SETTINGS" = "SETTINGS";
+"SUPPORT" = "SUPPORT";
+"ACCOUNT" = "ACCOUNT";
+"Notifications" = "Notifications";
+"Language" = "Language";
+"Contact Us" = "Contact Us";
+"Link Account" = "Link Account";
+"Sign Out" = "Sign Out";
+"Delete Account" = "Delete Account";
+"Version %@" = "Version %@";
+
+/* Lists */
+"No liked photos yet" = "No liked photos yet";
+"No uploaded photos yet" = "No uploaded photos yet";
+"Error: %@" = "Error: %@";
+"Unknown" = "Unknown";
+
+"Expires in %dd" = "Expires in %dd";
+"Expires in %dh" = "Expires in %dh";
+"Expires soon" = "Expires soon";
+"Expired" = "Expired";
+
+/* Contact & Link Account */
+"Your Email" = "Your Email";
+"Subject" = "Subject";
+"Your Message..." = "Your Message...";
+"Send Message" = "Send Message";
+"Thank You!" = "Thank You!";
+"Your message has been sent successfully." = "Your message has been sent successfully.";
+"Link your account to save your\ndata permanently." = "Link your account to save your\ndata permanently.";
+"Link with Google" = "Link with Google";
+"Link with Apple" = "Link with Apple";
+
+/* Alerts */
+"Are you sure you want to sign out?" = "Are you sure you want to sign out?";
+"This action cannot be undone. All your data will be permanently deleted." = "This action cannot be undone. All your data will be permanently deleted.";
+"Sent!" = "Sent!";
+"Error" = "Error";
+"OK" = "OK";
+"Failed to get presenting view controller." = "Failed to get presenting view controller.";
+
+/* AdFree Plan */
+"AdFree_MonthlySubscription" = "Monthly Subscription";
+"AdFree_PlanLabel" = "Plan";
+"AdFree_PlanValue" = "Ad-Free Premium";
+"AdFree_RenewsLabel" = "Renews";
+"AdFree_RenewsValue" = "Every Month";
+"AdFree_ExperienceLabel" = "Experience";
+"AdFree_ExperienceValue" = "No Interruptions";
+"AdFree_TotalPayLabel" = "Total Pay";
+"AdFree_CurrentPlanActive" = "Current Plan Active";
+"AdFree_Close" = "Close";
+"AdFree_Subscribe" = "Subscribe";
+"AdFree_Restore" = "Restore";
+"AdFree_RedeemCode" = "Redeem Code";
+"AdFree_Loading" = "Loading Plan...";
+
+/* Delete Post */
+"Delete Post" = "Delete Post";
+"DeletePost_Message" = "Are you sure you want to delete this photo permanently?";
+"Delete" = "Delete";
+"Cancel" = "Cancel";
+
+/* Completion Card */
+"Complete!" = "Complete!";
+"CompletionMessage" = "You have explored\nall currently posted moments!";
+"Reset & Re-spin" = "Reset & Re-spin";
+"Write a Review" = "Write a Review";
+
+/* Gacha Error */
+"GachaError_Message" = "Failed to load photo. Please try again.";
+
+/* Legal URLs */
+"TermsUrl" = "https://www.notion.so/Ziora-Terms-of-Service-2c0aacfc1c6f801f934cdafe1e0bf063?source=copy_link";
+"PrivacyUrl" = "https://www.notion.so/Ziora-Privacy-Policy-2c0aacfc1c6f805e99a5e847005b669e?source=copy_link";
+
+/* Community */
+"COMMUNITY" = "COMMUNITY";
+"Share App" = "Share App";
+"ShareMessage" = "Check out Ziora! 🌍✨";

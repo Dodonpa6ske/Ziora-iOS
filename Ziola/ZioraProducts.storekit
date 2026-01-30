@@ -1,0 +1,82 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "94CBFE15",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21433300",
+      "localizations" : [
+        {
+          "description" : "Unlock premium features",
+          "displayName" : "Ziola Premium",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "Ziola Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "C4BA1622",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Remove all ads and support development.",
+              "displayName" : "Ad Free Monthly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "広告を非表示にし、開発を支援します。",
+              "displayName" : "広告非表示プラン (月額)",
+              "locale" : "ja"
+            }
+          ],
+          "productID" : "com.akira.ziora.adfree.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Ad Free Monthly",
+          "subscriptionGroupID" : "21433300",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

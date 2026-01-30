@@ -1,0 +1,7 @@
+/* Permission Descriptions */
+"NSCameraUsageDescription" = "写真を撮影して投稿するためにカメラを使用します。";
+"NSPhotoLibraryUsageDescription" = "撮影した写真をライブラリに保存します。";
+"NSLocationWhenInUseUsageDescription" = "写真に撮影地情報を付与するために位置情報を使用します。";
+
+/* App Name (Optional) */
+"CFBundleDisplayName" = "Ziora";

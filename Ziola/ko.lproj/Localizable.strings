@@ -1,0 +1,160 @@
+/* 
+  Localizable.strings
+  Ziora
+*/
+
+"Onboarding_Welcome_Title" = "Welcome";
+"Onboarding_Welcome_Desc" = "Ziora는 사진으로 전 세계와 연결되는 공간입니다.\n당신에게 도착하는 사진도, 당신의 사진이 닿는 곳도 모두 무작위입니다.\n예측할 수 없는 ‘순수한 우연’과의 만남을 즐겨보세요.";
+
+"Onboarding_Share_Title" = "Share";
+"Onboarding_Share_Desc" = "완전히 익명으로 눈앞의 풍경을 공유해 보세요.\n팔로워나 ‘좋아요’, 화려한 연출은 신경 쓸 필요 없습니다.\n당신의 소소한 일상이 누군가에게는 절경이 됩니다.";
+
+"Onboarding_Discover_Title" = "Discover";
+"Onboarding_Discover_Desc" = "도착하는 것은 이름 모를 누군가의 진짜 일상입니다.\n꾸밈없는 있는 그대로의 세상.\n그곳에서 당신은 세상과의 희미한 연결을 느낄 수 있을 것입니다.";
+
+"Onboarding_Ready_Title" = "Ready";
+"Onboarding_Ready_Desc" = "세상은 상상보다 훨씬 넓고, 아직 보지 못한 만남으로 가득합니다.\n여권도 짐도 필요 없습니다.\n필요한 건 약간의 호기심뿐.\n지구를 돌려 세상과 만나보세요.";
+
+"Start_Journey" = "여정 시작하기";
+"Hold" = "누르는 중...";
+"Hold_to_Start" = "길게 누르기...";
+"Ready" = "준비 완료!";
+"Lets_Go" = "출발!";
+
+/* Tutorial */
+"Skip" = "건너뛰기";
+"Tap to Spin the Globe" = "지구본을 탭하여 돌려보세요!";
+"Your first photo awaits!" = "첫 번째 사진이 기다리고 있어요!";
+"Swipe up" = "위로 스와이프";
+
+/* Tutorial Location */
+"Tutorial_Country" = "일본";
+"Tutorial_Region" = "도쿄";
+"Tutorial_City" = "미나토구";
+"Tutorial_SubLocality" = "시바코엔";
+"Spin the Globe" = "지구본을 돌려주세요";
+"Search for unseen landscapes." = "아직 보지 못한 풍경을 찾아보세요.";
+"Your Turn to Share!" = "이제 당신의 차례입니다!";
+"Capture your view and share it\nwith someone across the world." = "당신의 풍경을 담아\n지구 반대편의 누군가에게 공유해보세요.";
+
+/* Terms */
+"Accept\nTerms" = "이용 약관\n동의";
+"By continuing, you agree to the [Ziora Terms of Service](%@) and [Privacy Policy](%@)" = "계속 진행하면 [Ziora 이용 약관](%@) 및 [개인정보 처리방침](%@)에 동의하는 것으로 간주됩니다.";
+"Agree and Continue" = "동의하고 계속하기";
+"Disagree" = "동의하지 않음";
+"Agreement\nRequired" = "동의\n필요";
+"To use Ziora, you need to agree to the Terms of Service and Privacy Policy.\nThese policies explain how we protect your data and ensure a safe experience for all users." = "Ziora를 이용하려면 이용 약관 및 개인정보 처리방침에 동의해야 합니다.\n이는 사용자의 데이터를 보호하고 안전한 서비스 이용 환경을 제공하기 위함입니다.";
+"Back to Agreement" = "동의 화면으로 돌아가기";
+"Close" = "닫기";
+
+/* Sign In */
+"Sign\nIn" = "로그인";
+"Sign in with Google" = "Google로 로그인";
+"Sign in with Apple" = "Apple로 로그인";
+"Continue as Guest" = "게스트로 계속하기";
+"By signing in, you agree to our" = "로그인 시 다음 항목에 동의하는 것으로 간주됩니다:";
+"Terms of Service" = "이용 약관";
+"and" = "및";
+"Privacy Policy" = "개인정보 처리방침";
+
+/* Guest Mode */
+"Start in Guest Mode" = "게스트 모드로 시작";
+"If you delete the app, your data will be erased, but you can later link an account to carry your data over." = "앱을 삭제하면 데이터가 지워지지만, 나중에 계정을 연동하여 데이터를 가져올 수 있습니다.";
+"Continue" = "계속하기";
+"Back" = "돌아가기";
+
+/* Notification */
+"NotificationTitle" = "Ziora";
+"NotificationBody" = "🌍 지구를 돌려 새로운 세계를 탐험해보세요!";
+"RetentionTitle" = "새로운 사진이 게시되었습니다";
+"RetentionBody" = "🌍 %@에서 새로운 사진이 발견되었습니다!";
+
+/* Menu */
+"Guest User" = "게스트 유저";
+"User" = "사용자";
+"Premium Member" = "프리미엄 회원";
+"Free Plan" = "무료 플랜";
+"Premium Plan" = "프리미엄 플랜";
+"Go Ad-Free" = "프리미엄 플랜으로";
+"Active" = "활성";
+"Remove ads" = "광고 제거하기";
+"SETTINGS" = "설정";
+"SUPPORT" = "지원";
+"ACCOUNT" = "계정";
+"Notifications" = "알림";
+"Language" = "언어 설정";
+"Contact Us" = "문의하기";
+"Link Account" = "계정 연동";
+"Sign Out" = "로그아웃";
+"Delete Account" = "계정 삭제";
+"Version %@" = "버전 %@";
+
+/* Lists */
+"No liked photos yet" = "아직 '좋아요'한 사진이 없습니다";
+"No uploaded photos yet" = "업로드된 사진이 없습니다";
+"Error: %@" = "오류: %@";
+"Unknown" = "알 수 없음";
+
+"Expires in %dd" = "%d일 후 만료";
+"Expires in %dh" = "%d시간 후 만료";
+"Expires soon" = "곧 만료됨";
+"Expired" = "만료됨";
+
+/* Contact & Link Account */
+"Your Email" = "이메일 주소";
+"Subject" = "제목";
+"Your Message..." = "메시지를 입력하세요...";
+"Send Message" = "보내기";
+"Thank You!" = "감사합니다!";
+"Your message has been sent successfully." = "메시지가 성공적으로 전송되었습니다.";
+"Link your account to save your\ndata permanently." = "계정을 연결하여 데이터를\n영구적으로 저장하세요.";
+"Link with Google" = "Google로 연결";
+"Link with Apple" = "Apple로 연결";
+
+/* Alerts */
+"Are you sure you want to sign out?" = "정말 로그아웃하시겠습니까?";
+"This action cannot be undone. All your data will be permanently deleted." = "이 작업은 되돌릴 수 없습니다. 모든 데이터가 영구적으로 삭제됩니다.";
+"Sent!" = "전송 완료!";
+"Error" = "오류";
+"OK" = "확인";
+"Failed to get presenting view controller." = "화면 컨트롤러를 가져오는 데 실패했습니다.";
+
+/* AdFree Plan */
+"AdFree_MonthlySubscription" = "월간 구독";
+"AdFree_PlanLabel" = "요금제";
+"AdFree_PlanValue" = "광고 없는 프리미엄";
+"AdFree_RenewsLabel" = "갱신";
+"AdFree_RenewsValue" = "매월";
+"AdFree_ExperienceLabel" = "경험";
+"AdFree_ExperienceValue" = "광고 없이 쾌적하게";
+"AdFree_TotalPayLabel" = "총 결제 금액";
+"AdFree_CurrentPlanActive" = "현재 이용 중인 플랜";
+"AdFree_Close" = "닫기";
+"AdFree_Subscribe" = "구독하기";
+"AdFree_Restore" = "구매 복원";
+"AdFree_RedeemCode" = "코드 사용";
+"AdFree_Loading" = "플랜 로딩 중...";
+
+/* Delete Post */
+"Delete Post" = "게시물 삭제";
+"DeletePost_Message" = "이 사진을 영구적으로 삭제하시겠습니까?";
+"Delete" = "삭제";
+"Cancel" = "취소";
+
+/* Completion Card */
+"Complete!" = "완료!";
+"CompletionMessage" = "현재 게시된\n모든 순간을 탐색했습니다!";
+"Reset & Re-spin" = "초기화하고 다시 돌리기";
+"Write a Review" = "리뷰 작성하기";
+
+/* Gacha Error */
+"GachaError_Message" = "사진을 불러오는 데 실패했습니다. 다시 시도해 주세요.";
+
+/* Legal URLs */
+"TermsUrl" = "https://www.notion.so/Ziora-Terms-of-Service-2c0aacfc1c6f801f934cdafe1e0bf063?source=copy_link";
+"PrivacyUrl" = "https://www.notion.so/Ziora-Privacy-Policy-2c0aacfc1c6f805e99a5e847005b669e?source=copy_link";
+
+/* Community */
+"COMMUNITY" = "커뮤니티";
+"Share App" = "앱 공유";
+"ShareMessage" = "Ziora와 함께 세계를 여행해보세요! 🌍✨";

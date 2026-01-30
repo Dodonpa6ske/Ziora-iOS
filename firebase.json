@@ -1,0 +1,35 @@
+{
+  "functions": [
+    {
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "source": "functions"
+    }
+  ],
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      { "source": "/support", "destination": "/support.html" },
+      { "source": "/privacy", "destination": "/privacy.html" }
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://www.notion.so/2d0aacfc1c6f806db5a4ce4e55891c80?source=copy_link",
+        "type": 301
+      }
+    ]
+  }
+}
